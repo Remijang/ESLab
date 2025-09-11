@@ -27,12 +27,16 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+typedef struct {
+	osMutexId_t mutex;
+	osMessageQueueId_t queue;
+	osSemaphoreId_t sid_Semaphore;
+} TaskArg;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define MSG_COUNT 16
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -43,55 +47,36 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+static osThreadId_t defaultTaskHandle;
+const osThreadAttr_t task1_attributes = {
+	.name = "defaultTask",
+	.stack_size = 128 * 4,
+	.priority = (osPriority_t)osPriorityNormal,
+};
+const osThreadAttr_t task2_attributes = {
+	.name = "myTask02",
+	.stack_size = 128 * 4,
+	.priority = (osPriority_t)osPriorityHigh7,
+};
+/* Definitions for myTask02 */
+osThreadId_t tid1, tid2;
+/* USER CODE BEGIN PV */
+static osMessageQueueId_t queue;
+static osSemaphoreId_t semaphore;
+static uint32_t exec;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+void StartTask1(void *argument);
+void StartTask2(void *argument);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define MSG_COUNT 16
-
-typedef struct task1_arg {
-	osMutexId_t mutex;
-} Task1Arg;
-
-static osMessageQueueId_t queue;
-
-void task1(void *argument) {
-	Task1Arg *arg = (Task1Arg *)argument;
-	osMutexId_t mutex = arg->mutex;
-	uint32_t diff;
-	osStatus_t stat;
-	while ((stat = osMessageQueueGet(queue, &diff, NULL, osWaitForever)) == osOK) {
-		osStatus_t mutexRes = osMutexAcquire(mutex, osWaitForever);
-		if (mutexRes != osOK) {
-			// TODO: error handling
-			continue;
-		}
-		if (diff >= 1000) {
-			for (int i = 0; i < 100; i++) {
-				HAL_GPIO_TogglePin(GPIOB, LED2_Pin);
-				HAL_delay(50);
-			}
-		} else {
-			for (int i = 0; i < 10; i++) {
-				HAL_GPIO_TogglePin(GPIOB, LED2_Pin);
-				HAL_delay(500);
-			}
-		}
-		mutexRes = osMutexAcquire(mutex);
-		// TODO: error handling
-	}
-	// TODO: error occur when reading from queue
-}
-
-void task2(void *argument) {}
 /* USER CODE END 0 */
 
 /**
@@ -122,15 +107,31 @@ int main(void) {
 	/* Initialize all configured peripherals */
 	MX_GPIO_Init();
 	/* USER CODE BEGIN 2 */
-
+	osKernelInitilize();
+	uint32_t timerDelay;
+	osStatus_t status;
+	osMutexId_t mutex_id;
+	const osMutexAttr_t Thread_Mutex_Attr = {
+		"threadMutex", osMutexRecursive | osMutexPrioInherit, NULL, 0U};
+	mutex_id = osMutexNew(&Thread_Mutex_Attr);
+	if (mutex_id == NULL) {
+		return -1;
+	}
+	queue = osMessageQueueNew(MSG_COUNT, sizeof(uint32_t), NULL);
+	if (queue == NULL) {
+		return -1;
+	}
+	semaphore = osSemaphoreNew(2U, 2U, NULL);
+	if (semaphore == NULL) {
+		return -1;
+	}
+	tid1 = osThreadNew(StartTask1, NULL, &task1_attributes);
+	tid2 = osThreadNew(StartTask2, NULL, &task2_attributes);
+	osKernelStart();
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
-	osKernelInitilize();
-	queue = osMessageQueueNew(MSG_COUNT, sizeof(uint32_t), NULL);
-	osSemaphoreId_t sem = osSemaphoreNew(1, 0, NULL);
-	osThreadNew(task1, (void *)&sem, NULL);
-	osKernelStart();
+
 	/* USER CODE BEGIN WHILE */
 	while (1) {
 		/* USER CODE END WHILE */
@@ -463,6 +464,42 @@ static void MX_GPIO_Init(void) {
 }
 
 /* USER CODE BEGIN 4 */
+void StartTask1(void *argument) {
+	TaskArg *arg = (TaskArg *)argument;
+	osMutexId_t mutex = arg->mutex;
+	uint32_t diff;
+	osStatus_t stat;
+	while ((stat = osMessageQueueGet(queue, &diff, NULL, osWaitForever)) == osOK) {
+		osStatus_t mutexRes = osMutexAcquire(mutex, osWaitForever);
+		if (mutexRes != osOK) {
+			// TODO: error handling
+			continue;
+		}
+		if (diff >= 1000) {
+			for (int i = 0; i < 100; i++) {
+				HAL_GPIO_TogglePin(GPIOB, LED2_Pin);
+				HAL_delay(50);
+			}
+		} else {
+			for (int i = 0; i < 10; i++) {
+				HAL_GPIO_TogglePin(GPIOB, LED2_Pin);
+				HAL_delay(500);
+			}
+		}
+		mutexRes = osMutexAcquire(mutex);
+		// TODO: error handling
+	}
+	// TODO: error occur when reading from queue
+}
+void StartTask02(void *argument) {
+	/* USER CODE BEGIN StartTask02 */
+	/* Infinite loop */
+	for (;;) {
+		HAL_GPIO_TogglePin(GPIOB, LED2_Pin);
+		osDelay(1000);
+	}
+	/* USER CODE END StartTask02 */
+}
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	switch (GPIO_Pin) {
 		case BUTTON_EXTI13_Pin:
