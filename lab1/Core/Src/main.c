@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "stdio.h"
 
 #include "cmsis_os2.h"
 /* Private includes ----------------------------------------------------------*/
@@ -34,7 +35,7 @@ typedef struct {
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define MSG_COUNT 16
+#define MSG_COUNT 4
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -45,7 +46,6 @@ typedef struct {
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-static osThreadId_t defaultTaskHandle;
 const osThreadAttr_t task1_attributes = {
 	.name = "defaultTask",
 	.stack_size = 128 * 4,
@@ -59,9 +59,9 @@ const osThreadAttr_t task2_attributes = {
 /* Definitions for myTask02 */
 osThreadId_t tid1, tid2;
 /* USER CODE BEGIN PV */
-static osMessageQueueId_t queue;
-static osSemaphoreId_t semaphore;
-static uint32_t exec;
+osMessageQueueId_t queue;
+osSemaphoreId_t semaphore;
+uint32_t exec = 1;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -106,9 +106,8 @@ int main(void) {
 	/* Initialize all configured peripherals */
 	MX_GPIO_Init();
 	/* USER CODE BEGIN 2 */
-	osKernelInitilize();
-	uint32_t timerDelay;
-	osStatus_t status;
+	osKernelInitialize();
+	const uint32_t delay = 10000U;
 	osMutexId_t mutex_id;
 	const osMutexAttr_t Thread_Mutex_Attr = {
 		"threadMutex", osMutexRecursive | osMutexPrioInherit, NULL, 0U};
@@ -117,10 +116,12 @@ int main(void) {
 		return -1;
 	}
 	queue = osMessageQueueNew(MSG_COUNT, sizeof(uint32_t), NULL);
+	printf("queue: %x\n", queue);
 	if (queue == NULL) {
 		return -1;
 	}
 	semaphore = osSemaphoreNew(1U, 0U, NULL);
+	printf("semaphore: %x\n", semaphore);
 	if (semaphore == NULL) {
 		return -1;
 	}
@@ -129,6 +130,7 @@ int main(void) {
 	if (timer_id == NULL) {
 		return -1;
 	}
+	osTimerStart(timer_id, delay);
 	tid1 = osThreadNew(StartTask1, NULL, &task1_attributes);
 	tid2 = osThreadNew(StartTask2, NULL, &task2_attributes);
 	osKernelStart();
@@ -482,12 +484,12 @@ void StartTask1(void *argument) {
 		if (diff >= 1000) {
 			for (int i = 0; i < 100; i++) {
 				HAL_GPIO_TogglePin(GPIOB, LED2_Pin);
-				HAL_delay(50);
+				HAL_Delay(50);
 			}
 		} else {
 			for (int i = 0; i < 10; i++) {
 				HAL_GPIO_TogglePin(GPIOB, LED2_Pin);
-				HAL_delay(500);
+				HAL_Delay(500);
 			}
 		}
 		mutexRes = osMutexRelease(mutex);
@@ -498,18 +500,18 @@ void StartTask1(void *argument) {
 void StartTask2(void *argument) {
 	/* USER CODE BEGIN StartTask02 */
 	TaskArg *arg = (TaskArg *)argument;
-	osMutex_t = arg->mutex;
+	osMutexId_t mutex = arg->mutex;
 	/* Infinite loop */
 	osStatus_t stat;
 	while ((stat = osSemaphoreAcquire(semaphore, osWaitForever)) == osOK) {
 		osStatus_t mutexRes = osMutexAcquire(mutex, osWaitForever);
-		if (mutextRes != osOK) {
+		if (mutexRes != osOK) {
 			// TODO: error handling
 			continue;
 		}
 		for (int i = 0; i < 40; i++) {
 			HAL_GPIO_TogglePin(GPIOB, LED2_Pin);
-			HAL_delay(50);
+			HAL_Delay(50);
 		}
 		mutexRes = osMutexRelease(mutex);
 	}
@@ -517,28 +519,27 @@ void StartTask2(void *argument) {
 	/* USER CODE END StartTask02 */
 }
 void TimerCallback(void *argument) {
-	osStatus_t stat = osSemaphoreRelease(semaphore);
+	osSemaphoreRelease(semaphore);
 	// error handling
 }
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	switch (GPIO_Pin) {
 		case BUTTON_EXTI13_Pin:
 			uint32_t now = HAL_GetTick();
-			uint8_t rising = HAL_GPIO_ReadPin(Button_GPIO_Port, pButton);
+			uint8_t rising = HAL_GPIO_ReadPin(BUTTON_EXTI13_GPIO_Port, GPIO_Pin);
 			static uint8_t lastEdge = -1;
 			static uint32_t lastRising;
-			static uint32_t lastFalling;
+			// static uint32_t lastFalling;
 			if (rising == lastEdge) {
 				if (rising == GPIO_PIN_SET)
 					lastRising = now;
-				else
-					lastFalling = now;
 			} else if (rising == GPIO_PIN_SET) {
 				lastRising = now;
 			} else {
 				uint32_t diff = now - lastRising;
-				if (mq_id != NULL)
-					osStatus_t stat = osMessageQueuePut(*mq_id, (void *)&diff, 0, 0);
+				if (queue != NULL) {
+					osMessageQueuePut(queue, (void *)&diff, 0, 0);
+				}
 				// TODO: error handling
 			}
 			lastEdge = rising;

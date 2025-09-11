@@ -2,3 +2,6 @@ Debug/
 .vscode/
 .settings/
 lab1 Debug.launch
+.project
+lab1/.cproject
+lab1/.mxproject
