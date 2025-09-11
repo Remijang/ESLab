@@ -61,20 +61,34 @@ typedef struct task1_arg {
 	osMutexId_t mutex;
 } Task1Arg;
 
-static osMessageQueueId_t *queue;
+static osMessageQueueId_t queue;
 
 void task1(void *argument) {
 	Task1Arg *arg = (Task1Arg *)argument;
 	osMutexId_t mutex = arg->mutex;
 	uint32_t diff;
 	osStatus_t stat;
-	while ((stat = osMessageQueueGet(*queue, &diff, NULL, osWaitForever)) == osOK) {
-		if (diff >= 1000) {
-			mutex =
-		} else {
+	while ((stat = osMessageQueueGet(queue, &diff, NULL, osWaitForever)) == osOK) {
+		osStatus_t mutexRes = osMutexAcquire(mutex, osWaitForever);
+		if (mutexRes != osOK) {
+			// TODO: error handling
+			continue;
 		}
+		if (diff >= 1000) {
+			for (int i = 0; i < 100; i++) {
+				HAL_GPIO_TogglePin(GPIOB, LED2_Pin);
+				HAL_delay(50);
+			}
+		} else {
+			for (int i = 0; i < 10; i++) {
+				HAL_GPIO_TogglePin(GPIOB, LED2_Pin);
+				HAL_delay(500);
+			}
+		}
+		mutexRes = osMutexAcquire(mutex);
+		// TODO: error handling
 	}
-	// TODO: error occur
+	// TODO: error occur when reading from queue
 }
 
 void task2(void *argument) {}
@@ -113,7 +127,7 @@ int main(void) {
 
 	/* Infinite loop */
 	osKernelInitilize();
-	queue = &osMessageQueueNew(MSG_COUNT, sizeof(uint32_t), NULL);
+	queue = osMessageQueueNew(MSG_COUNT, sizeof(uint32_t), NULL);
 	osSemaphoreId_t sem = osSemaphoreNew(1, 0, NULL);
 	osThreadNew(task1, (void *)&sem, NULL);
 	osKernelStart();
@@ -450,25 +464,31 @@ static void MX_GPIO_Init(void) {
 
 /* USER CODE BEGIN 4 */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-	uint32_t now = HAL_GetTick();
-	uint8_t rising = HAL_GPIO_ReadPin(Button_GPIO_Port, pButton);
-	static uint8_t lastEdge = -1;
-	static uint32_t lastRising;
-	static uint32_t lastFalling;
-	if (rising == lastEdge) {
-		if (rising == GPIO_PIN_SET)
-			lastRising = now;
-		else
-			lastFalling = now;
-	} else if (rising == GPIO_PIN_SET) {
-		lastRising = now;
-	} else {
-		uint32_t diff = now - lastRising;
-		if (mq_id != NULL)
-			osStatus_t stat = osMessageQueuePut(*mq_id, (void *)&diff, 0, 0);
-		// TODO: error handling
+	switch (GPIO_Pin) {
+		case BUTTON_EXTI13_Pin:
+			uint32_t now = HAL_GetTick();
+			uint8_t rising = HAL_GPIO_ReadPin(Button_GPIO_Port, pButton);
+			static uint8_t lastEdge = -1;
+			static uint32_t lastRising;
+			static uint32_t lastFalling;
+			if (rising == lastEdge) {
+				if (rising == GPIO_PIN_SET)
+					lastRising = now;
+				else
+					lastFalling = now;
+			} else if (rising == GPIO_PIN_SET) {
+				lastRising = now;
+			} else {
+				uint32_t diff = now - lastRising;
+				if (mq_id != NULL)
+					osStatus_t stat = osMessageQueuePut(*mq_id, (void *)&diff, 0, 0);
+				// TODO: error handling
+			}
+			lastEdge = rising;
+			break;
+		default:
+			break;
 	}
-	lastEdge = rising;
 }
 /* USER CODE END 4 */
 
