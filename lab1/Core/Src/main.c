@@ -29,8 +29,6 @@
 /* USER CODE BEGIN PTD */
 typedef struct {
 	osMutexId_t mutex;
-	osMessageQueueId_t queue;
-	osSemaphoreId_t sid_Semaphore;
 } TaskArg;
 /* USER CODE END PTD */
 
@@ -71,6 +69,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 void StartTask1(void *argument);
 void StartTask2(void *argument);
+void TimerCallback(void *argument);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -121,8 +120,13 @@ int main(void) {
 	if (queue == NULL) {
 		return -1;
 	}
-	semaphore = osSemaphoreNew(2U, 2U, NULL);
+	semaphore = osSemaphoreNew(1U, 0U, NULL);
 	if (semaphore == NULL) {
+		return -1;
+	}
+	osTimerId_t timer_id;
+	timer_id = osTimerNew(TimerCallback, osTimerPeriodic, &exec, NULL);
+	if (timer_id == NULL) {
 		return -1;
 	}
 	tid1 = osThreadNew(StartTask1, NULL, &task1_attributes);
@@ -486,19 +490,35 @@ void StartTask1(void *argument) {
 				HAL_delay(500);
 			}
 		}
-		mutexRes = osMutexAcquire(mutex);
+		mutexRes = osMutexRelease(mutex);
 		// TODO: error handling
 	}
 	// TODO: error occur when reading from queue
 }
-void StartTask02(void *argument) {
+void StartTask2(void *argument) {
 	/* USER CODE BEGIN StartTask02 */
+	TaskArg *arg = (TaskArg *)argument;
+	osMutex_t = arg->mutex;
 	/* Infinite loop */
-	for (;;) {
-		HAL_GPIO_TogglePin(GPIOB, LED2_Pin);
-		osDelay(1000);
+	osStatus_t stat;
+	while ((stat = osSemaphoreAcquire(semaphore, osWaitForever)) == osOK) {
+		osStatus_t mutexRes = osMutexAcquire(mutex, osWaitForever);
+		if (mutextRes != osOK) {
+			// TODO: error handling
+			continue;
+		}
+		for (int i = 0; i < 40; i++) {
+			HAL_GPIO_TogglePin(GPIOB, LED2_Pin);
+			HAL_delay(50);
+		}
+		mutexRes = osMutexRelease(mutex);
 	}
+	// error handling
 	/* USER CODE END StartTask02 */
+}
+void TimerCallback(void *argument) {
+	osStatus_t stat = osSemaphoreRelease(semaphore);
+	// error handling
 }
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	switch (GPIO_Pin) {
