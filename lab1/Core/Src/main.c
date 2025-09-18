@@ -101,7 +101,7 @@ int main(void)
 
   /* Create the timer(s) */
   /* creation of Timer */
-  timer = osTimerNew(Timer_Callback, osTimerPeriodic, (void *)0, &timer_attributes);
+  timer = osTimerNew(Timer_Callback, osTimerPeriodic, NULL, &timer_attributes);
 
   /* Create the queue(s) */
   /* creation of Queue */
@@ -460,10 +460,10 @@ void Task1_Func(void *argument)
 {
 	osStatus_t status;
 
-	uint8_t duration = 5;
-	uint8_t freq[2] = {1, 10};
+	uint16_t duration = 5;
+	uint16_t freq[2] = {1, 10};
 	uint16_t interval[2];
-	uint8_t iter[2];
+	uint16_t iter[2];
 	for (char i = 0; i < 2; ++i) {
 		interval[i] = 1000 / freq[i] / 2;
 		iter[i] = freq[i] * duration * 2;
@@ -476,9 +476,9 @@ void Task1_Func(void *argument)
 	  status = osMessageQueueGet(queue, &diff, NULL, osWaitForever);
 	  status = osMutexAcquire(mutex, osWaitForever);
 	  opt = diff > 1000U ? 1 : 0;
-	  for (int _ = 0; _ < iter[opt]; ++_) {
+	  for (uint16_t _ = 0; _ < iter[opt]; ++_) {
 		  HAL_GPIO_TogglePin(GPIOB, LED2_Pin);
-		  osDelay(interval[opt]);
+		  HAL_Delay(interval[opt]);
 	  }
 	  status = osMutexRelease(mutex);
   }
@@ -487,24 +487,19 @@ void Task1_Func(void *argument)
 void Task2_Func(void *argument)
 {
 	osStatus_t status;
-
-	uint8_t duration = 2;
-	uint8_t freq = 10;
+	uint16_t duration = 2;
+	uint16_t freq = 10;
 	uint16_t interval = 1000 / freq / 2;
-	uint8_t iter = freq * duration * 2;
-
-	osDelay(5000);
+	uint16_t iter = freq * duration * 2;
 
   while(1) {
 	  status = osSemaphoreAcquire(semaphore, osWaitForever);
 	  status = osMutexAcquire(mutex, 0);
-	  for (int _ = 0; _ < iter; ++_) {
+	  for (uint16_t _ = 0; _ < iter; ++_) {
 		  HAL_GPIO_TogglePin(GPIOB, LED2_Pin);
-		  osDelay(interval);
+		  HAL_Delay(interval);
 	  }
 	  status = osMutexRelease(mutex);
-	  status = osSemaphoreRelease(semaphore);
-	  osDelay(2000);
   }
 }
 
@@ -512,11 +507,7 @@ void Task2_Func(void *argument)
 void Timer_Callback(void *argument)
 {
 	osStatus_t status;
-
-	uint16_t duration = 2;
 	status = osSemaphoreRelease(semaphore);
-	osDelay(duration * 1000);
-	status = osSemaphoreAcquire(semaphore, osWaitForever);
 }
 
 /**
