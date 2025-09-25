@@ -61,6 +61,11 @@
 			<locationURI>PARENT-2-PROJECT_LOC/Common/Src/es_wifi_io.c</locationURI>
 		</link>
 		<link>
+			<name>Application/WIFI/http.c</name>
+			<type>1</type>
+			<location>/home/joshua/Documents/ntu/embed/labs/lab2/Projects/B-L475E-IOT01A/Applications/WiFi/Common/Src/http.c</location>
+		</link>
+		<link>
 			<name>Application/WIFI/wifi.c</name>
 			<type>1</type>
 			<locationURI>PARENT-2-PROJECT_LOC/Common/Src/wifi.c</locationURI>
