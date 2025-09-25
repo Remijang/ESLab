@@ -33,7 +33,7 @@
 		<link>
 			<name>Application/Inc</name>
 			<type>2</type>
-			<location>D:/ST/STM32CubeIDE_1.19.0/STM32CubeIDE/ST/STM32CubeIDE/ESLab/lab2/Projects/B-L475E-IOT01A/Applications/WiFi/WiFi_Client_Server/Inc</location>
+			<location>/home/joshua/Documents/ntu/embed/labs/lab2/Projects/B-L475E-IOT01A/Applications/WiFi/WiFi_Client_Server/Inc</location>
 		</link>
 		<link>
 			<name>Doc/readme.txt</name>
@@ -158,22 +158,22 @@
 		<link>
 			<name>Drivers/BSP/B-L475E-IOT01/stm32l475e_iot01_accelero.c</name>
 			<type>1</type>
-			<location>D:/ST/STM32CubeIDE_1.19.0/STM32CubeIDE/ST/STM32CubeIDE/ESLab/lab2/Drivers/BSP/B-L475E-IOT01/stm32l475e_iot01_accelero.c</location>
+			<location>/home/joshua/Documents/ntu/embed/labs/lab2/Drivers/BSP/B-L475E-IOT01/stm32l475e_iot01_accelero.c</location>
 		</link>
 		<link>
 			<name>Drivers/BSP/B-L475E-IOT01/stm32l475e_iot01_accelero.h</name>
 			<type>1</type>
-			<location>D:/ST/STM32CubeIDE_1.19.0/STM32CubeIDE/ST/STM32CubeIDE/ESLab/lab2/Drivers/BSP/B-L475E-IOT01/stm32l475e_iot01_accelero.h</location>
+			<location>/home/joshua/Documents/ntu/embed/labs/lab2/Drivers/BSP/B-L475E-IOT01/stm32l475e_iot01_accelero.h</location>
 		</link>
 		<link>
 			<name>Drivers/BSP/Components/Common</name>
 			<type>2</type>
-			<location>D:/ST/STM32CubeIDE_1.19.0/STM32CubeIDE/ST/STM32CubeIDE/ESLab/lab2/Drivers/BSP/Components/Common</location>
+			<location>/home/joshua/Documents/ntu/embed/labs/lab2/Drivers/BSP/Components/Common</location>
 		</link>
 		<link>
 			<name>Drivers/BSP/Components/lsm6dsl</name>
 			<type>2</type>
-			<location>D:/ST/STM32CubeIDE_1.19.0/STM32CubeIDE/ST/STM32CubeIDE/ESLab/lab2/Drivers/BSP/Components/lsm6dsl</location>
+			<location>/home/joshua/Documents/ntu/embed/labs/lab2/Drivers/BSP/Components/lsm6dsl</location>
 		</link>
 	</linkedResources>
 </projectDescription>
