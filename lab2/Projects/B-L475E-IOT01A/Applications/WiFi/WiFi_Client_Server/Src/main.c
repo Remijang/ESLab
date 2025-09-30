@@ -25,10 +25,10 @@
 #define TERMINAL_USE
 
 /* Update SSID and PASSWORD with own Access point settings */
-#define SSID "Make_CSIE_Great_Again"
-#define PASSWORD "asdfghjkl"
+#define SSID "Joshua"
+#define PASSWORD "Joshua0213"
 
-uint8_t RemoteIP[] = {192, 168, 46, 81};
+uint8_t RemoteIP[] = {172, 20, 10, 2};
 #define RemotePORT 8002
 
 #define WIFI_WRITE_TIMEOUT 10000
@@ -37,9 +37,9 @@ uint8_t RemoteIP[] = {192, 168, 46, 81};
 #define CONNECTION_TRIAL_MAX 10
 
 #if defined(TERMINAL_USE)
-#define TERMOUT(...) printf(__VA_ARGS__)
+	#define TERMOUT(...) printf(__VA_ARGS__)
 #else
-#define TERMOUT(...)
+	#define TERMOUT(...)
 #endif
 
 /* Private variables ---------------------------------------------------------*/
@@ -49,14 +49,14 @@ extern UART_HandleTypeDef hDiscoUart;
 
 /* Private function prototypes -----------------------------------------------*/
 #if defined(TERMINAL_USE)
-#ifdef __GNUC__
-/* With GCC, small TERMOUT (option LD Linker->Libraries->Small TERMOUT
-   set to 'Yes') calls __io_putchar() */
-#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
-#else
-#define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
-#endif /* __GNUC__ */
-#endif /* TERMINAL_USE */
+	#ifdef __GNUC__
+		/* With GCC, small TERMOUT (option LD Linker->Libraries->Small TERMOUT
+		   set to 'Yes') calls __io_putchar() */
+		#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
+	#else
+		#define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
+	#endif /* __GNUC__ */
+#endif	   /* TERMINAL_USE */
 
 static void SystemClock_Config(void);
 

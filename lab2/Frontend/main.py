@@ -1,28 +1,35 @@
-from flask import Flask, render_template, request, jsonify
-import yaml
-import logging
+import io
 
+import matplotlib.pyplot as plt
+import numpy as np
+import yaml
+from flask import Flask, Response, jsonify, render_template, request
 
 with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
 app = Flask(__name__, template_folder="template/")
-latest_data = None
+received_data = np.zeros((3, 1))
+latest_data = np.zeros((3, 1))
 
 
 @app.route("/", methods=["POST"])
 def receive_data():
-    global latest_data
+    global latest_data, received_data
     try:
         payload = request.get_json()
         if payload is None:
             return jsonify({"error": "Invalid JSON"}), 400
 
-        latest_data = payload
-        print("Received data:", latest_data)
+        latest_data += np.array([payload["X"], payload["Y"], payload["Z"]]).reshape(
+            (3, 1)
+        )
+
+        received_data = np.concatenate((received_data, latest_data), axis=-1)
         return jsonify({"status": "ok"}), 200
 
     except Exception as e:
+        print(str(e))
         return jsonify({"error": str(e)}), 500
 
 
@@ -30,6 +37,48 @@ def receive_data():
 def get_latest():
     """Optional: return the latest data for a frontend"""
     return jsonify(latest_data)
+
+
+@app.route("/plot.png")
+def plot_png():
+    x, y, z = received_data[0], received_data[1], received_data[2]
+    fig = plt.figure()
+
+    ax = fig.add_subplot(111, projection="3d")
+
+    if x.shape[0] == 1:
+        output = io.BytesIO()
+        fig.savefig(output, format="png")
+        plt.close(fig)
+        output.seek(0)
+        return Response(output.getvalue(), mimetype="image/png")
+
+    ax.set_xlim([x.min(), x.max()])
+    ax.set_ylim([y.min(), y.max()])
+    ax.set_zlim([z.min(), z.max()])
+    ax.scatter(x, y, z, c="r", marker="o")
+    n = x.shape[0]
+    for i in range(n - 1):
+        ax.quiver(
+            x[i],
+            y[i],
+            z[i],
+            x[i + 1] - x[i],
+            y[i + 1] - y[i],
+            z[i + 1] - z[i],
+            arrow_length_ratio=0.01,
+            color="black",
+        )
+    output = io.BytesIO()
+    fig.savefig(output, format="png")
+    plt.close(fig)
+    output.seek(0)
+    return Response(output.getvalue(), mimetype="image/png")
+
+
+@app.route("/", methods=["GET"])
+def render():
+    return render_template("index.html")
 
 
 if __name__ == "__main__":
