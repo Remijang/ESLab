@@ -31,6 +31,11 @@
 	</natures>
 	<linkedResources>
 		<link>
+			<name>Application/Accelerato</name>
+			<type>2</type>
+			<location>/home/joshua/Documents/ntu/embed/labs/lab2/Projects/B-L475E-IOT01A/Applications/Accelerato</location>
+		</link>
+		<link>
 			<name>Application/Inc</name>
 			<type>2</type>
 			<location>/home/joshua/Documents/ntu/embed/labs/lab2/Projects/B-L475E-IOT01A/Applications/WiFi/WiFi_Client_Server/Inc</location>
