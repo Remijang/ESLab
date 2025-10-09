@@ -3,3 +3,4 @@
 .settings/
 **/**.launch
 lab2/**/.git*/
+**/env.h

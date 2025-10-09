@@ -21,6 +21,7 @@
 #define __MAIN_H
 
 /* Includes ------------------------------------------------------------------*/
+#include "acc_helper.h"
 #include "http.h"
 #include "stdio.h"
 #include "stm32l475e_iot01.h"

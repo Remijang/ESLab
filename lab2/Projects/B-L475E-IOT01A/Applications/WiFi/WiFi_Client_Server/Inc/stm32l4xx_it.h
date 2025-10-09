@@ -1,20 +1,20 @@
 /**
-  ******************************************************************************
-  * @file    Wifi/WiFi_Client_Server/inc/stm32l4xx_it..h
-  * @author  MCD Application Team
-  * @brief   This file contains the headers of the interrupt handlers.
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2017 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file    Wifi/WiFi_Client_Server/inc/stm32l4xx_it..h
+ * @author  MCD Application Team
+ * @brief   This file contains the headers of the interrupt handlers.
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2017 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
 #ifndef __STM32L4xx_IT_H
@@ -25,7 +25,7 @@ extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "main.h" 
+#include "main.h"
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
 /* Exported macro ------------------------------------------------------------*/
@@ -41,10 +41,10 @@ void DebugMon_Handler(void);
 void PendSV_Handler(void);
 void SysTick_Handler(void);
 void EXTI1_IRQHandler(void);
+void EXTI15_10_IRQHandler(void);
 void SPI3_IRQHandler(void);
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* __STM32L4xx_IT_H */
-

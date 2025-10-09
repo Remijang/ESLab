@@ -3,5 +3,32 @@
   <body>
     <h2>Accelerometer Data</h2>
     <img src="/plot.png" alt="Accelerometer Plot" />
+
+    <h3>Status:</h3>
+    <div id="status">Waiting for motion...</div>
+
+    <script>
+      // Connect to the SSE endpoint
+      const eventSource = new EventSource("/events");
+
+      eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        console.log("Received:", data);
+
+        // Update the text
+        document.getElementById(
+          "status"
+        ).textContent = `Motion detected at ${data.time}`;
+
+        // Force reload the image if new data plot is updated
+        const img = document.getElementById("plot");
+        img.src = "/plot.png?cachebuster=" + new Date().getTime();
+      };
+
+      eventSource.onerror = () => {
+        document.getElementById("status").textContent =
+          "Disconnected from server";
+      };
+    </script>
   </body>
 </html>

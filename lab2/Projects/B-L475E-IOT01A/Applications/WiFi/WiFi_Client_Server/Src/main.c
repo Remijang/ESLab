@@ -20,16 +20,13 @@
 
 #include <string.h>
 
+#include "env.h"
+
 /* Private defines -----------------------------------------------------------*/
 
 #define TERMINAL_USE
 
-/* Update SSID and PASSWORD with own Access point settings */
-#define SSID "Joshua"
-#define PASSWORD "Joshua0213"
-
-uint8_t RemoteIP[] = {172, 20, 10, 2};
-#define RemotePORT 8002
+extern uint8_t RemoteIP[];
 
 #define WIFI_WRITE_TIMEOUT 10000
 #define WIFI_READ_TIMEOUT 10000
@@ -98,6 +95,9 @@ int main(void) {
 
 	BSP_COM_Init(COM1, &hDiscoUart);
 #endif /* TERMINAL_USE */
+	__HAL_RCC_GPIOD_CLK_ENABLE();
+	ACC_InitGPIO();
+	ACC_SingnificantMotionDetectionOn();
 
 	TERMOUT("****** WIFI Module in TCP Client mode demonstration ****** \n\n");
 	TERMOUT("TCP Client Instructions :\n");
@@ -176,6 +176,7 @@ int main(void) {
 		}
 		HAL_Delay(1000);
 	}
+	while (1) {}
 }
 
 /**
@@ -273,9 +274,23 @@ void assert_failed(uint8_t *file, uint32_t line) {
  * @retval None
  */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	TERMOUT("%d\n", GPIO_Pin);
 	switch (GPIO_Pin) {
 		case (GPIO_PIN_1): {
 			SPI_WIFI_ISR();
+			break;
+		}
+		case (GPIO_PIN_11): {
+			char sendData[64] = "{ \"significant_motion\" : true }";
+			uint16_t Datalen;
+			(void)HTTP_Method(RemoteIP,
+							  RemotePORT,
+							  (uint8_t *)sendData,
+							  strlen(sendData),
+							  &Datalen,
+							  WIFI_WRITE_TIMEOUT,
+							  HTTP_POST,
+							  "/motion");
 			break;
 		}
 		default: {

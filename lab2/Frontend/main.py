@@ -1,8 +1,10 @@
 import io
+import time
 
 import matplotlib.pyplot as plt
 import numpy as np
 import yaml
+import json
 from flask import Flask, Response, jsonify, render_template, request
 
 with open("config.yaml", "r") as f:
@@ -11,6 +13,7 @@ with open("config.yaml", "r") as f:
 app = Flask(__name__, template_folder="template/")
 received_data = np.zeros((3, 1))
 latest_data = np.zeros((3, 1))
+latest_event = None
 
 
 @app.route("/", methods=["POST"])
@@ -79,6 +82,31 @@ def plot_png():
 @app.route("/", methods=["GET"])
 def render():
     return render_template("index.html")
+
+
+@app.route("/events")
+def events():
+    def stream():
+        last_sent = None
+        while True:
+            global latest_event
+            if latest_event != last_sent and latest_event is not None:
+                yield f"data: {json.dumps(latest_event)}\n\n"
+                last_sent = latest_event
+            time.sleep(1)
+
+    return Response(stream(), mimetype="text/event-stream")
+
+
+@app.route("/motion", methods=["POST"])
+def motion():
+    global latest_event
+    latest_event = {
+        "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "message": "Significant motion detected!",
+    }
+    print(f"[IOT] {latest_event}")
+    return jsonify({"status": "ok"})
 
 
 if __name__ == "__main__":
