@@ -224,7 +224,7 @@ tBleStatus Add_HWServW2ST_Service(void) {
 	ret = aci_gatt_add_char(HWServW2STHandle,
 							UUID_TYPE_128,
 							char_uuid.Char_UUID_128,
-							2 + 3 * 3 * 2,
+							2 + 3 * 2,
 							CHAR_PROP_NOTIFY,
 							ATTR_PERMISSION_NONE,
 							GATT_NOTIFY_READ_REQ_AND_WAIT_FOR_APPL_RESP,

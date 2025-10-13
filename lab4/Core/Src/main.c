@@ -20,7 +20,7 @@
 #include "main.h"
 
 #include "app_bluenrg_ms.h"
-#include "cmsis_os.h"
+#include "cmsis_os2.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -39,7 +39,8 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+#include <stdio.h>
+#define PRINTF(...) printf(__VA_ARGS__)
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -58,15 +59,15 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 osThreadId_t tid1;
 const osThreadAttr_t task1_attributes = {
 	.name = "Task_BLE",
-	.stack_size = 128 * 4,
+	.stack_size = 512 * 4,
 	.priority = (osPriority_t)osPriorityNormal,
 };
 /* Definitions for Task2 */
 osThreadId_t tid2;
 const osThreadAttr_t task2_attributes = {
 	.name = "Task_ACC",
-	.stack_size = 128 * 4,
-	.priority = (osPriority_t)osPriorityNormal,
+	.stack_size = 512 * 4,
+	.priority = (osPriority_t)osPriorityHigh,
 };
 osSemaphoreId_t semaphore;
 const osSemaphoreAttr_t binarySem_attributes = {.name = "BinarySem"};
@@ -134,7 +135,9 @@ int main(void) {
 	MX_USART3_UART_Init();
 	MX_USB_OTG_FS_PCD_Init();
 	MX_TIM16_Init();
-
+	MX_BlueNRG_MS_Init();
+	BSP_ACCELERO_Init();
+	ACC_InitGPIO();
 	/* USER CODE BEGIN 2 */
 	freq = 10;
 	osKernelInitialize();
@@ -148,7 +151,10 @@ int main(void) {
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
-	while (1) {}
+
+	while (1) {
+		PRINTF("%d\n", osKernelGetTickCount());
+	}
 	/* USER CODE END 3 */
 }
 
@@ -625,25 +631,43 @@ void Fetch_Motion_Values() {
 }
 
 void Task_ACC_Func(void *argument) {
-	BSP_ACCELERO_Init();
-	ACC_InitGPIO();
-	while (1) {
-		osDelay(1000 / freq);
+	PRINTF("acc\n");
+	for (;;) {
 		// osMutexAcquire(mutex, osWaitForever);
+		PRINTF("acc\n");
 		Fetch_Motion_Values();
+		PRINTF("%d %d %d\n", x_axes.AXIS_X, x_axes.AXIS_Y, x_axes.AXIS_Z);
 		// osMutexRelease(mutex);
-		osSemaphoreRelease(semaphore);
+		osStatus_t res = osSemaphoreRelease(semaphore);
+		osDelay(1);
 	}
+	PRINTF("Exit\n");
 }
 
 void Task_BLE_Func(void *argument) {
-	MX_BlueNRG_MS_Init();
-	while (1) {
-		(void)osSemaphoreAcquire(semaphore, osWaitForever);
+	PRINTF("ble\n");
+	osStatus_t ret;
+	for (;;) {
+		for (;;) {
+			ret = osSemaphoreAcquire(semaphore, 0);
+			PRINTF("%d\n", osKernelGetTickCount());
+			if (ret != osOK) {
+				osThreadYield();
+			} else {
+				break;
+			}
+		}
+
+		if (ret != osOK) {
+			PRINTF("Semaphore acquire failed: %d\n", ret);
+		}
+		PRINTF("ble\n");
 		// osMutexAcquire(mutex, osWaitForever);
 		MX_BlueNRG_MS_Process();
+		PRINTF("ble\n");
 		// osMutexRelease(mutex);
 	}
+	PRINTF("Exit\n");
 }
 /* USER CODE END 4 */
 
