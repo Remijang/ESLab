@@ -140,6 +140,9 @@ int main(void) {
 	ACC_InitGPIO();
 	/* USER CODE BEGIN 2 */
 	freq = 10;
+	HAL_NVIC_SetPriority(PendSV_IRQn, 0, 4);
+	// HAL_NVIC_SetPriority(SysTick_IRQn, 0, 4);
+
 	osKernelInitialize();
 	semaphore = osSemaphoreNew(1U, 0U, &binarySem_attributes);
 	mutex = osMutexNew(&mutex_attributes);
@@ -152,9 +155,7 @@ int main(void) {
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
 
-	while (1) {
-		PRINTF("%d\n", osKernelGetTickCount());
-	}
+	while (1) {}
 	/* USER CODE END 3 */
 }
 
@@ -634,14 +635,12 @@ void Task_ACC_Func(void *argument) {
 	PRINTF("acc\n");
 	for (;;) {
 		// osMutexAcquire(mutex, osWaitForever);
-		PRINTF("acc\n");
 		Fetch_Motion_Values();
 		PRINTF("%d %d %d\n", x_axes.AXIS_X, x_axes.AXIS_Y, x_axes.AXIS_Z);
 		// osMutexRelease(mutex);
 		osStatus_t res = osSemaphoreRelease(semaphore);
-		osDelay(1);
+		osDelay(100);
 	}
-	PRINTF("Exit\n");
 }
 
 void Task_BLE_Func(void *argument) {
@@ -650,7 +649,7 @@ void Task_BLE_Func(void *argument) {
 	for (;;) {
 		for (;;) {
 			ret = osSemaphoreAcquire(semaphore, 0);
-			PRINTF("%d\n", osKernelGetTickCount());
+			// PRINTF("%d\n", osKernelGetTickCount());
 			if (ret != osOK) {
 				osThreadYield();
 			} else {
@@ -658,16 +657,10 @@ void Task_BLE_Func(void *argument) {
 			}
 		}
 
-		if (ret != osOK) {
-			PRINTF("Semaphore acquire failed: %d\n", ret);
-		}
-		PRINTF("ble\n");
 		// osMutexAcquire(mutex, osWaitForever);
 		MX_BlueNRG_MS_Process();
-		PRINTF("ble\n");
 		// osMutexRelease(mutex);
 	}
-	PRINTF("Exit\n");
 }
 /* USER CODE END 4 */
 
