@@ -70,7 +70,6 @@ static volatile uint8_t user_button_pressed = 0;
 /* Private function prototypes -----------------------------------------------*/
 static void User_Process(void);
 static void User_Init(void);
-void Fetch_Motion_Values(void);
 
 /* USER CODE BEGIN PFP */
 
@@ -282,11 +281,6 @@ static void User_Process(void) {
 		BSP_LED_Toggle(LED2);
 
 		if (connected) {
-			/* Set a random seed */
-			srand(HAL_GetTick());
-
-			/* Update emulated Acceleration, Gyroscope and Sensor Fusion data */
-			Fetch_Motion_Values();
 			Acc_Update(&x_axes);
 
 #if !USE_BUTTON
@@ -298,14 +292,6 @@ static void User_Process(void) {
 		user_button_pressed = 0;
 	}
 #endif
-}
-
-void Fetch_Motion_Values() {
-	int16_t pDataXYZ[3];
-	BSP_ACCELERO_AccGetXYZ(pDataXYZ);
-	x_axes.AXIS_X = pDataXYZ[0];
-	x_axes.AXIS_Y = pDataXYZ[2];
-	x_axes.AXIS_Z = pDataXYZ[1];
 }
 
 /**

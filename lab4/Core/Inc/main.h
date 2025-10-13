@@ -28,6 +28,7 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "b_l475e_iot01a1.h"
+#include "gatt_db.h"
 #include "hci_tl_interface.h"
 #include "stm32l475e_iot01_accelero.h"
 #include "stm32l4xx_hal.h"

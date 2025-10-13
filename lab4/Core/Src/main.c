@@ -20,6 +20,7 @@
 #include "main.h"
 
 #include "app_bluenrg_ms.h"
+#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -54,6 +55,26 @@ UART_HandleTypeDef huart3;
 
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
+osThreadId_t tid1;
+const osThreadAttr_t task1_attributes = {
+	.name = "Task_BLE",
+	.stack_size = 128 * 4,
+	.priority = (osPriority_t)osPriorityNormal,
+};
+/* Definitions for Task2 */
+osThreadId_t tid2;
+const osThreadAttr_t task2_attributes = {
+	.name = "Task_ACC",
+	.stack_size = 128 * 4,
+	.priority = (osPriority_t)osPriorityNormal,
+};
+osSemaphoreId_t semaphore;
+const osSemaphoreAttr_t binarySem_attributes = {.name = "BinarySem"};
+osMutexId_t mutex;
+const osMutexAttr_t mutex_attributes = {.name = "Mutex"};
+uint16_t freq;
+
+extern AxesRaw_t x_axes;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -68,6 +89,9 @@ static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_TIM16_Init(void);
 void ACC_InitGPIO(void);
+void Task_BLE_Func(void *argument);
+void Task_ACC_Func(void *argument);
+void Fetch_Motion_Values();
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -110,21 +134,21 @@ int main(void) {
 	MX_USART3_UART_Init();
 	MX_USB_OTG_FS_PCD_Init();
 	MX_TIM16_Init();
-	MX_BlueNRG_MS_Init();
-	BSP_ACCELERO_Init();
-	ACC_InitGPIO();
+
 	/* USER CODE BEGIN 2 */
+	freq = 10;
+	osKernelInitialize();
+	semaphore = osSemaphoreNew(1U, 0U, &binarySem_attributes);
+	mutex = osMutexNew(&mutex_attributes);
+	tid1 = osThreadNew(Task_BLE_Func, NULL, &task1_attributes);
+	tid2 = osThreadNew(Task_ACC_Func, NULL, &task2_attributes);
+	osKernelStart();
 
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
-	while (1) {
-		/* USER CODE END WHILE */
-
-		MX_BlueNRG_MS_Process();
-		/* USER CODE BEGIN 3 */
-	}
+	while (1) {}
 	/* USER CODE END 3 */
 }
 
@@ -590,6 +614,36 @@ void ACC_InitGPIO(void) {
 	HAL_GPIO_Init(GPIOD, &gpio_init_structure);
 	HAL_NVIC_SetPriority(EXTI15_10_IRQn, 2, 0);
 	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+}
+
+void Fetch_Motion_Values() {
+	int16_t pDataXYZ[3];
+	BSP_ACCELERO_AccGetXYZ(pDataXYZ);
+	x_axes.AXIS_X = pDataXYZ[0];
+	x_axes.AXIS_Y = pDataXYZ[1];
+	x_axes.AXIS_Z = pDataXYZ[2];
+}
+
+void Task_ACC_Func(void *argument) {
+	BSP_ACCELERO_Init();
+	ACC_InitGPIO();
+	while (1) {
+		osDelay(1000 / freq);
+		// osMutexAcquire(mutex, osWaitForever);
+		Fetch_Motion_Values();
+		// osMutexRelease(mutex);
+		osSemaphoreRelease(semaphore);
+	}
+}
+
+void Task_BLE_Func(void *argument) {
+	MX_BlueNRG_MS_Init();
+	while (1) {
+		(void)osSemaphoreAcquire(semaphore, osWaitForever);
+		// osMutexAcquire(mutex, osWaitForever);
+		MX_BlueNRG_MS_Process();
+		// osMutexRelease(mutex);
+	}
 }
 /* USER CODE END 4 */
 
