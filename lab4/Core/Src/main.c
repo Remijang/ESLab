@@ -59,15 +59,15 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 osThreadId_t tid1;
 const osThreadAttr_t task1_attributes = {
 	.name = "Task_BLE",
-	.stack_size = 512 * 4,
+	.stack_size = 256 * 4,
 	.priority = (osPriority_t)osPriorityNormal,
 };
 /* Definitions for Task2 */
 osThreadId_t tid2;
 const osThreadAttr_t task2_attributes = {
 	.name = "Task_ACC",
-	.stack_size = 512 * 4,
-	.priority = (osPriority_t)osPriorityHigh,
+	.stack_size = 128 * 4,
+	.priority = (osPriority_t)osPriorityNormal,
 };
 osSemaphoreId_t semaphore;
 const osSemaphoreAttr_t binarySem_attributes = {.name = "BinarySem"};
@@ -76,6 +76,7 @@ const osMutexAttr_t mutex_attributes = {.name = "Mutex"};
 uint16_t freq;
 
 extern AxesRaw_t x_axes;
+int16_t pDataXYZ[3];
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -623,42 +624,32 @@ void ACC_InitGPIO(void) {
 	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
-void Fetch_Motion_Values() {
-	int16_t pDataXYZ[3];
-	BSP_ACCELERO_AccGetXYZ(pDataXYZ);
-	x_axes.AXIS_X = pDataXYZ[0];
-	x_axes.AXIS_Y = pDataXYZ[1];
-	x_axes.AXIS_Z = pDataXYZ[2];
-}
 
 void Task_ACC_Func(void *argument) {
 	PRINTF("acc\n");
 	for (;;) {
 		// osMutexAcquire(mutex, osWaitForever);
-		Fetch_Motion_Values();
-		PRINTF("%d %d %d\n", x_axes.AXIS_X, x_axes.AXIS_Y, x_axes.AXIS_Z);
+		BSP_ACCELERO_AccGetXYZ(pDataXYZ);
+		x_axes.AXIS_X = pDataXYZ[0];
+		x_axes.AXIS_Y = pDataXYZ[1];
+		x_axes.AXIS_Z = pDataXYZ[2];
+		// PRINTF("%x %x %x\n", pDataXYZ[0], pDataXYZ[1], pDataXYZ[2]);
+		PRINTF("acc\n");
+		osDelay(1000);
 		// osMutexRelease(mutex);
-		osStatus_t res = osSemaphoreRelease(semaphore);
-		osDelay(100);
+		osSemaphoreRelease(semaphore);
 	}
 }
 
 void Task_BLE_Func(void *argument) {
 	PRINTF("ble\n");
-	osStatus_t ret;
 	for (;;) {
-		for (;;) {
-			ret = osSemaphoreAcquire(semaphore, 0);
-			// PRINTF("%d\n", osKernelGetTickCount());
-			if (ret != osOK) {
-				osThreadYield();
-			} else {
-				break;
-			}
-		}
+		osSemaphoreAcquire(semaphore, osWaitForever);
 
 		// osMutexAcquire(mutex, osWaitForever);
 		MX_BlueNRG_MS_Process();
+		PRINTF("ble\n");
+		osDelay(1000);
 		// osMutexRelease(mutex);
 	}
 }

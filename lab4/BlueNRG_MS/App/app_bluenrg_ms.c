@@ -45,7 +45,7 @@
  * 1 to send environmental and motion data when pushing the user button
  * 0 to send environmental and motion data automatically (period = 1 sec)
  */
-#undef USE_BUTTON 1
+#define USE_BUTTON 0
 
 /* Private macros ------------------------------------------------------------*/
 
@@ -232,9 +232,7 @@ void MX_BlueNRG_MS_Process(void) {
 	/* USER CODE END BlueNRG_MS_Process_PreTreatment */
 
 	User_Process();
-	PRINTF("Processed\n");
 	hci_user_evt_proc();
-	PRINTF("Processed pending event\n");
 
 	/* USER CODE BEGIN BlueNRG_MS_Process_PostTreatment */
 
