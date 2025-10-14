@@ -166,7 +166,26 @@
 				  0xc5,                              \
 				  0x1b)
 
-uint16_t HWServW2STHandle, EnvironmentalCharHandle, AccGyroMagCharHandle;
+#define COPY_SAMPLE_FREQUENCY_CHAR_UUID(uuid_struct) \
+	COPY_UUID_128(uuid_struct,                       \
+				  0x11,                              \
+				  0x11,                              \
+				  0x00,                              \
+				  0x00,                              \
+				  0x11,                              \
+				  0x11,                              \
+				  0x00,                              \
+				  0x00,                              \
+				  0x11,                              \
+				  0x11,                              \
+				  0x00,                              \
+				  0x00,                              \
+				  0x11,                              \
+				  0x11,                              \
+				  0x00,                              \
+				  0x00)
+
+uint16_t HWServW2STHandle, EnvironmentalCharHandle, AccGyroMagCharHandle, FrequencyHandle;
 uint16_t SWServW2STHandle, QuaternionsCharHandle;
 
 /* UUIDS */
@@ -176,6 +195,7 @@ Char_UUID_t char_uuid;
 extern AxesRaw_t x_axes;
 extern AxesRaw_t g_axes;
 extern AxesRaw_t m_axes;
+extern uint32_t freq;
 
 extern uint16_t connection_handle;
 extern uint32_t start_time;
@@ -195,7 +215,7 @@ tBleStatus Add_HWServW2ST_Service(void) {
 	ret = aci_gatt_add_serv(UUID_TYPE_128,
 							service_uuid.Service_UUID_128,
 							PRIMARY_SERVICE,
-							1 + 3 * 5,
+							1 + 4 * 5,
 							&HWServW2STHandle);
 	if (ret != BLE_STATUS_SUCCESS)
 		return BLE_STATUS_ERROR;
@@ -225,7 +245,7 @@ tBleStatus Add_HWServW2ST_Service(void) {
 							UUID_TYPE_128,
 							char_uuid.Char_UUID_128,
 							2 + 3 * 2,
-							CHAR_PROP_NOTIFY,
+							CHAR_PROP_NOTIFY | CHAR_PROP_READ,
 							ATTR_PERMISSION_NONE,
 							GATT_NOTIFY_READ_REQ_AND_WAIT_FOR_APPL_RESP,
 							16,
@@ -234,6 +254,20 @@ tBleStatus Add_HWServW2ST_Service(void) {
 	if (ret != BLE_STATUS_SUCCESS)
 		return BLE_STATUS_ERROR;
 
+	COPY_SAMPLE_FREQUENCY_CHAR_UUID(uuid);
+	BLUENRG_memcpy(&char_uuid.Char_UUID_128, uuid, 16);
+	ret = aci_gatt_add_char(HWServW2STHandle,
+							UUID_TYPE_128,
+							char_uuid.Char_UUID_128,
+							4,
+							CHAR_PROP_WRITE | CHAR_PROP_WRITE_WITHOUT_RESP,
+							ATTR_PERMISSION_NONE,
+							GATT_NOTIFY_ATTRIBUTE_WRITE,
+							16,
+							0,
+							&FrequencyHandle);
+	if (ret != BLE_STATUS_SUCCESS)
+		return BLE_STATUS_ERROR;
 	return BLE_STATUS_SUCCESS;
 }
 
@@ -325,8 +359,8 @@ tBleStatus Acc_Update(AxesRaw_t *x_axes) {
 	HOST_TO_LE_16(buff + 4, (uint16_t)x_axes->AXIS_Y);
 	HOST_TO_LE_16(buff + 6, (uint16_t)x_axes->AXIS_Z);
 
-	ret = aci_gatt_update_char_value(
-		HWServW2STHandle, AccGyroMagCharHandle, 0, 2 + 2 * 3, buff);
+	ret = aci_gatt_update_char_value_ext_IDB05A1(
+		HWServW2STHandle, AccGyroMagCharHandle, NOTIFICATION, 8, 0, 2 + 2 * 3, buff);
 	if (ret != BLE_STATUS_SUCCESS) {
 		PRINTF("Error while updating Acceleration characteristic: 0x%02X\n", ret);
 		return BLE_STATUS_ERROR;
@@ -391,6 +425,7 @@ tBleStatus Quat_Update(AxesRaw_t *data) {
  * Return         : None.
  *******************************************************************************/
 void Read_Request_CB(uint16_t handle) {
+	PRINTF("Read Requested\n");
 	tBleStatus ret;
 
 	if (handle == AccGyroMagCharHandle + 1) {
@@ -402,6 +437,18 @@ void Read_Request_CB(uint16_t handle) {
 		if (ret != BLE_STATUS_SUCCESS) {
 			PRINTF("aci_gatt_allow_read() failed: 0x%02x\r\n", ret);
 		}
+	}
+}
+
+void Frequency_Update(uint32_t *freq, uint8_t *data, uint8_t length) {
+	if (!freq || !data)
+		return;
+	*freq = *(uint32_t *)(data);
+}
+
+void Write_Request_CB(uint16_t handle, uint8_t *data, uint8_t length) {
+	if (handle == FrequencyHandle + 1) {
+		Frequency_Update(&freq, data, length);
 	}
 }
 

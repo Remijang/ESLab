@@ -140,14 +140,14 @@ int main(void) {
 	BSP_ACCELERO_Init();
 	ACC_InitGPIO();
 	/* USER CODE BEGIN 2 */
-	freq = 10;
+	freq = 1;
 	HAL_NVIC_SetPriority(PendSV_IRQn, 0, 4);
 	// HAL_NVIC_SetPriority(SysTick_IRQn, 0, 4);
 
 	osKernelInitialize();
 	semaphore = osSemaphoreNew(1U, 0U, &binarySem_attributes);
 	mutex = osMutexNew(&mutex_attributes);
-	tid1 = osThreadNew(Task_BLE_Func, NULL, &task1_attributes);
+	// tid1 = osThreadNew(Task_BLE_Func, NULL, &task1_attributes);
 	tid2 = osThreadNew(Task_ACC_Func, NULL, &task2_attributes);
 	osKernelStart();
 
@@ -624,33 +624,21 @@ void ACC_InitGPIO(void) {
 	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
-
 void Task_ACC_Func(void *argument) {
-	PRINTF("acc\n");
 	for (;;) {
-		// osMutexAcquire(mutex, osWaitForever);
 		BSP_ACCELERO_AccGetXYZ(pDataXYZ);
 		x_axes.AXIS_X = pDataXYZ[0];
 		x_axes.AXIS_Y = pDataXYZ[1];
 		x_axes.AXIS_Z = pDataXYZ[2];
-		// PRINTF("%x %x %x\n", pDataXYZ[0], pDataXYZ[1], pDataXYZ[2]);
-		PRINTF("acc\n");
-		osDelay(1000);
-		// osMutexRelease(mutex);
-		osSemaphoreRelease(semaphore);
+		MX_BlueNRG_MS_Process();
+		osDelay(osKernelGetTickFreq() / freq);
+		PRINTF("%d %d %d\n", x_axes.AXIS_X, x_axes.AXIS_Y, x_axes.AXIS_Z);
 	}
 }
 
 void Task_BLE_Func(void *argument) {
-	PRINTF("ble\n");
 	for (;;) {
-		osSemaphoreAcquire(semaphore, osWaitForever);
-
-		// osMutexAcquire(mutex, osWaitForever);
-		MX_BlueNRG_MS_Process();
-		PRINTF("ble\n");
 		osDelay(1000);
-		// osMutexRelease(mutex);
 	}
 }
 /* USER CODE END 4 */
