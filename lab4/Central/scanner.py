@@ -13,6 +13,7 @@ CCCD_UUID = "00002902-0000-1000-8000-00805f9b34fb"
 TARGET_UUID = "11110000-1111-0000-1111-000011110000"
 TARGET_SERVICE_UUID = "00000000-0001-11e1-9ab4-0002a5d5c51b"
 TARGET_CHAR_UUID = "00e00000000111e1ac360002a5d5c51b"
+DEVICE_NAME = "Lab4OWO"
 
 
 class ScanDelegate(DefaultDelegate):
@@ -45,7 +46,7 @@ def connect():
             print(complete_local_name)
         else:
             continue
-        if complete_local_name != "BlueNRG":
+        if complete_local_name != DEVICE_NAME:
             continue
 
         print("Device %s (%s), RSSI=%d dB" % (dev.addr, dev.addrType, dev.rssi))
@@ -103,7 +104,7 @@ def main():
     def ble_notification_simulator():
         while True:
             if peripheral.waitForNotifications(1.0):
-                time.sleep(0.1)
+                time.sleep(0.05)
 
     log_area = TextArea(style="class:output-field", scrollbar=True, focusable=False)
     input_field = TextArea(

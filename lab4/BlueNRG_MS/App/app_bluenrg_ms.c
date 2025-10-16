@@ -103,7 +103,7 @@ void MX_BlueNRG_MS_Init(void) {
 	/* USER CODE END BlueNRG_MS_Init_PreTreatment */
 
 	/* Initialize the peripherals and the BLE Stack */
-	const char *name = "BlueNRG";
+	const char *name = "Lab4OWO";
 	uint16_t service_handle, dev_name_char_handle, appearance_char_handle;
 
 	uint8_t bdaddr_len_out;
@@ -147,6 +147,13 @@ void MX_BlueNRG_MS_Init(void) {
 		while (1)
 			;
 	}
+	PRINTF("Device address: %02x:%02x:%02x:%02x:%02x:%02x",
+		   bdaddr[0],
+		   bdaddr[1],
+		   bdaddr[2],
+		   bdaddr[3],
+		   bdaddr[4],
+		   bdaddr[5]);
 
 	/* GATT Init */
 	ret = aci_gatt_init();

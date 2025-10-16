@@ -91,9 +91,7 @@ static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_TIM16_Init(void);
 void ACC_InitGPIO(void);
-void Task_BLE_Func(void *argument);
 void Task_ACC_Func(void *argument);
-void Fetch_Motion_Values();
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -139,15 +137,13 @@ int main(void) {
 	MX_BlueNRG_MS_Init();
 	BSP_ACCELERO_Init();
 	ACC_InitGPIO();
+
 	/* USER CODE BEGIN 2 */
 	freq = 1;
-	HAL_NVIC_SetPriority(PendSV_IRQn, 0, 4);
-	// HAL_NVIC_SetPriority(SysTick_IRQn, 0, 4);
 
 	osKernelInitialize();
 	semaphore = osSemaphoreNew(1U, 0U, &binarySem_attributes);
 	mutex = osMutexNew(&mutex_attributes);
-	// tid1 = osThreadNew(Task_BLE_Func, NULL, &task1_attributes);
 	tid2 = osThreadNew(Task_ACC_Func, NULL, &task2_attributes);
 	osKernelStart();
 
@@ -155,7 +151,6 @@ int main(void) {
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
-
 	while (1) {}
 	/* USER CODE END 3 */
 }
@@ -633,12 +628,6 @@ void Task_ACC_Func(void *argument) {
 		MX_BlueNRG_MS_Process();
 		osDelay(osKernelGetTickFreq() / freq);
 		PRINTF("%d %d %d\n", x_axes.AXIS_X, x_axes.AXIS_Y, x_axes.AXIS_Z);
-	}
-}
-
-void Task_BLE_Func(void *argument) {
-	for (;;) {
-		osDelay(1000);
 	}
 }
 /* USER CODE END 4 */
