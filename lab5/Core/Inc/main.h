@@ -84,10 +84,6 @@ void Error_Handler(void);
 #define ARD_A2_GPIO_Port GPIOC
 #define ARD_D1_Pin GPIO_PIN_0
 #define ARD_D1_GPIO_Port GPIOA
-#define ARD_D0_Pin GPIO_PIN_1
-#define ARD_D0_GPIO_Port GPIOA
-#define ARD_D10_Pin GPIO_PIN_2
-#define ARD_D10_GPIO_Port GPIOA
 #define ARD_D4_Pin GPIO_PIN_3
 #define ARD_D4_GPIO_Port GPIOA
 #define ARD_D7_Pin GPIO_PIN_4
