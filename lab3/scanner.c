@@ -29,10 +29,6 @@
 #include <string.h>
 #include <sys/queue.h>
 
-// // #ifdef GATTLIB_LOG_BACKEND_SYSLOG
-// #include <syslog.h>
-// // #endif
-
 #include "gattlib.h"
 
 #define BLE_SCAN_TIMEOUT 5
@@ -66,10 +62,15 @@ static void notification_handler(const uuid_t* uuid,
 								 void* user_data) {
 	uintptr_t i;
 
-	printf("Notification Handler: ");
-
+	printf("Data received: \n");
+	printf("    raw (hex): ");
 	for (i = 0; i < data_length; i++) {
 		printf("%02x ", data[i]);
+	}
+	printf("\n");
+	printf("    char: ");
+	for (i = 0; i < data_length; i++) {
+		printf("%c", data[i]);
 	}
 	printf("\n");
 }
@@ -87,10 +88,8 @@ static void on_device_connect(gattlib_adapter_t* adapter,
 
 	ret = gattlib_discover_primary(connection, &services, &services_count);
 
-	printf("%x %x\n", services, services_count);
-
 	if (ret != GATTLIB_SUCCESS) {
-		fprintf(stderr, "Fail to discover primary services.");
+		fprintf(stderr, "Fail to discover primary services.\n");
 		goto EXIT;
 	}
 
@@ -121,7 +120,7 @@ static void on_device_connect(gattlib_adapter_t* adapter,
 									  &characteristics,
 									  &characteristics_count);
 	if (ret != 0) {
-		fprintf(stderr, "Fail to discover characteristics.");
+		fprintf(stderr, "Fail to discover characteristics.\n");
 		goto EXIT;
 	}
 
@@ -140,7 +139,7 @@ static void on_device_connect(gattlib_adapter_t* adapter,
 			break;
 		}
 	}
-
+	free(characteristics);
 	if (!flag) {
 		printf("target characteristic not found\n");
 		goto EXIT;
@@ -152,7 +151,7 @@ static void on_device_connect(gattlib_adapter_t* adapter,
 								 sizeof(enable_notification));
 	ret = gattlib_register_notification(connection, notification_handler, NULL);
 	if (ret != GATTLIB_SUCCESS) {
-		fprintf(stderr, "Fail to register notification callback.");
+		fprintf(stderr, "Fail to register notification callback.\n");
 		goto EXIT;
 	}
 
@@ -160,22 +159,22 @@ static void on_device_connect(gattlib_adapter_t* adapter,
 	ret = gattlib_string_to_uuid(
 		notification_UUID_str, strlen(notification_UUID_str) + 1, &notification_UUID);
 	if (ret != GATTLIB_SUCCESS) {
-		fprintf(stderr, "Wrong UUID format");
+		fprintf(stderr, "Wrong UUID format\n");
 		goto EXIT;
 	}
 
 	ret = gattlib_notification_start(connection, &notification_UUID);
 	if (ret != GATTLIB_SUCCESS) {
-		fprintf(stderr, "Fail to start notification. Error: %x", ret);
+		fprintf(stderr, "Fail to start notification. Error: %x\n", ret);
 		goto EXIT;
 	}
 
-	printf("Wait for notification for 20 seconds...");
+	printf("Wait for notification for 20 seconds...\n");
 	g_usleep(20 * G_USEC_PER_SEC);
 	// free(characteristics);
 
 EXIT:
-	gattlib_disconnect(connection, true /* wait_disconnection */);
+	gattlib_disconnect(connection, false /* wait_disconnection */);
 	pthread_mutex_lock(&m_connection_terminated_lock);
 	pthread_cond_signal(&m_connection_terminated);
 	pthread_mutex_unlock(&m_connection_terminated_lock);
@@ -196,7 +195,7 @@ static void* ble_connect_device(void* arg) {
 						  NULL);
 	if (ret != GATTLIB_SUCCESS) {
 		fprintf(
-			stderr, "Failed to connect to the bluetooth device '%s'", connection->addr);
+			stderr, "Failed to connect to the bluetooth device '%s'\n", connection->addr);
 	} else {
 		printf("Successfully connect\n");
 	}
@@ -220,7 +219,7 @@ static void ble_discovered_device(gattlib_adapter_t* adapter,
 	printf("Discovered %s - '%s'\n", addr, name);
 	connection = calloc(sizeof(struct connection_t), 1);
 	if (connection == NULL) {
-		fprintf(stderr, "Failt to allocate connection.");
+		fprintf(stderr, "Failt to allocate connection.\n");
 		return;
 	}
 	connection->addr = strdup(addr);
@@ -228,7 +227,7 @@ static void ble_discovered_device(gattlib_adapter_t* adapter,
 
 	ret = pthread_create(&connection->thread, NULL, ble_connect_device, connection);
 	if (ret != 0) {
-		fprintf(stderr, "Failt to create BLE connection thread.");
+		fprintf(stderr, "Failt to create BLE connection thread.\n");
 		free(connection);
 		return;
 	}
@@ -241,7 +240,7 @@ static void* ble_task(void* arg) {
 
 	ret = gattlib_adapter_open(adapter_name, &adapter);
 	if (ret) {
-		fprintf(stderr, "Failed to open adapter.");
+		fprintf(stderr, "Failed to open adapter.\n");
 		return NULL;
 	}
 
@@ -249,10 +248,11 @@ static void* ble_task(void* arg) {
 	ret = gattlib_adapter_scan_enable(
 		adapter, ble_discovered_device, BLE_SCAN_TIMEOUT, NULL /* user_data */);
 	if (ret) {
-		fprintf(stderr, "Failed to scan.");
+		fprintf(stderr, "Failed to scan.\n");
 		goto EXIT;
 	}
 
+	gattlib_adapter_scan_disable(adapter);
 	puts("Scan completed");
 	pthread_mutex_unlock(&g_mutex);
 
@@ -269,7 +269,6 @@ EXIT:
 	pthread_mutex_lock(&m_connection_terminated_lock);
 	pthread_cond_wait(&m_connection_terminated, &m_connection_terminated_lock);
 	pthread_mutex_unlock(&m_connection_terminated_lock);
-	gattlib_adapter_scan_disable(adapter);
 	gattlib_adapter_close(adapter);
 	return NULL;
 }
@@ -286,14 +285,11 @@ int main(int argc, const char* argv[]) {
 		return 1;
 	}
 
-	// openlog("gattlib_ble_scan", LOG_CONS | LOG_NDELAY | LOG_PERROR, LOG_USER);
-	// setlogmask(LOG_UPTO(LOG_INFO));
-
 	LIST_INIT(&g_ble_connections);
 
 	ret = gattlib_mainloop(ble_task, NULL);
 	if (ret != GATTLIB_SUCCESS) {
-		fprintf(stderr, "Failed to create gattlib mainloop");
+		fprintf(stderr, "Failed to create gattlib mainloop\n");
 	}
 
 	return ret;
