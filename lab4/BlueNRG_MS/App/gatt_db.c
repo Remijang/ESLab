@@ -321,34 +321,6 @@ fail:
  * @param  AxesRaw_t structure containing acceleration value in mg.
  * @retval tBleStatus Status
  */
-// tBleStatus Acc_Update(AxesRaw_t *x_axes, AxesRaw_t *g_axes, AxesRaw_t *m_axes) {
-// 	uint8_t buff[2 + 2 * 3 * 3];
-// 	tBleStatus ret;
-
-// 	HOST_TO_LE_16(buff, (HAL_GetTick() >> 3));
-
-// 	HOST_TO_LE_16(buff + 2, -x_axes->AXIS_Y);
-// 	HOST_TO_LE_16(buff + 4, x_axes->AXIS_X);
-// 	HOST_TO_LE_16(buff + 6, -x_axes->AXIS_Z);
-
-// 	HOST_TO_LE_16(buff + 8, g_axes->AXIS_Y);
-// 	HOST_TO_LE_16(buff + 10, g_axes->AXIS_X);
-// 	HOST_TO_LE_16(buff + 12, g_axes->AXIS_Z);
-
-// 	HOST_TO_LE_16(buff + 14, m_axes->AXIS_Y);
-// 	HOST_TO_LE_16(buff + 16, m_axes->AXIS_X);
-// 	HOST_TO_LE_16(buff + 18, m_axes->AXIS_Z);
-
-// 	ret = aci_gatt_update_char_value(
-// 		HWServW2STHandle, AccGyroMagCharHandle, 0, 2 + 2 * 3 * 3, buff);
-// 	if (ret != BLE_STATUS_SUCCESS) {
-// 		PRINTF("Error while updating Acceleration characteristic: 0x%02X\n", ret);
-// 		return BLE_STATUS_ERROR;
-// 	}
-
-// 	return BLE_STATUS_SUCCESS;
-// }
-
 tBleStatus Acc_Update(AxesRaw_t *x_axes) {
 	uint8_t buff[2 + 2 * 3];
 	tBleStatus ret;

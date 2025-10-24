@@ -24,6 +24,7 @@
 
 #include "bluenrg_conf.h"
 #include "bluenrg_def.h"
+#include "bluenrg_gap_aci.h"
 #include "bluenrg_gatt_aci.h"
 
 /** @brief Macro that stores Value into a buffer in Little Endian Format (2 bytes)*/
@@ -321,34 +322,6 @@ fail:
  * @param  AxesRaw_t structure containing acceleration value in mg.
  * @retval tBleStatus Status
  */
-// tBleStatus Acc_Update(AxesRaw_t *x_axes, AxesRaw_t *g_axes, AxesRaw_t *m_axes) {
-// 	uint8_t buff[2 + 2 * 3 * 3];
-// 	tBleStatus ret;
-
-// 	HOST_TO_LE_16(buff, (HAL_GetTick() >> 3));
-
-// 	HOST_TO_LE_16(buff + 2, -x_axes->AXIS_Y);
-// 	HOST_TO_LE_16(buff + 4, x_axes->AXIS_X);
-// 	HOST_TO_LE_16(buff + 6, -x_axes->AXIS_Z);
-
-// 	HOST_TO_LE_16(buff + 8, g_axes->AXIS_Y);
-// 	HOST_TO_LE_16(buff + 10, g_axes->AXIS_X);
-// 	HOST_TO_LE_16(buff + 12, g_axes->AXIS_Z);
-
-// 	HOST_TO_LE_16(buff + 14, m_axes->AXIS_Y);
-// 	HOST_TO_LE_16(buff + 16, m_axes->AXIS_X);
-// 	HOST_TO_LE_16(buff + 18, m_axes->AXIS_Z);
-
-// 	ret = aci_gatt_update_char_value(
-// 		HWServW2STHandle, AccGyroMagCharHandle, 0, 2 + 2 * 3 * 3, buff);
-// 	if (ret != BLE_STATUS_SUCCESS) {
-// 		PRINTF("Error while updating Acceleration characteristic: 0x%02X\n", ret);
-// 		return BLE_STATUS_ERROR;
-// 	}
-
-// 	return BLE_STATUS_SUCCESS;
-// }
-
 tBleStatus Acc_Update(AxesRaw_t *x_axes) {
 	uint8_t buff[2 + 2 * 3];
 	tBleStatus ret;
@@ -363,55 +336,6 @@ tBleStatus Acc_Update(AxesRaw_t *x_axes) {
 		HWServW2STHandle, AccGyroMagCharHandle, NOTIFICATION, 8, 0, 2 + 2 * 3, buff);
 	if (ret != BLE_STATUS_SUCCESS) {
 		PRINTF("Error while updating Acceleration characteristic: 0x%02X\n", ret);
-		return BLE_STATUS_ERROR;
-	}
-
-	return BLE_STATUS_SUCCESS;
-}
-
-/**
- * @brief  Update quaternions characteristic value
- * @param  SensorAxes_t *data Structure containing the quaterions
- * @retval tBleStatus      Status
- */
-tBleStatus Quat_Update(AxesRaw_t *data) {
-	tBleStatus ret;
-	uint8_t buff[2 + 6 * SEND_N_QUATERNIONS];
-
-	HOST_TO_LE_16(buff, (HAL_GetTick() >> 3));
-
-#if SEND_N_QUATERNIONS == 1
-	HOST_TO_LE_16(buff + 2, data[0].AXIS_X);
-	HOST_TO_LE_16(buff + 4, data[0].AXIS_Y);
-	HOST_TO_LE_16(buff + 6, data[0].AXIS_Z);
-#elif SEND_N_QUATERNIONS == 2
-	HOST_TO_LE_16(buff + 2, data[0].AXIS_X);
-	HOST_TO_LE_16(buff + 4, data[0].AXIS_Y);
-	HOST_TO_LE_16(buff + 6, data[0].AXIS_Z);
-
-	HOST_TO_LE_16(buff + 8, data[1].AXIS_X);
-	HOST_TO_LE_16(buff + 10, data[1].AXIS_Y);
-	HOST_TO_LE_16(buff + 12, data[1].AXIS_Z);
-#elif SEND_N_QUATERNIONS == 3
-	HOST_TO_LE_16(buff + 2, data[0].AXIS_X);
-	HOST_TO_LE_16(buff + 4, data[0].AXIS_Y);
-	HOST_TO_LE_16(buff + 6, data[0].AXIS_Z);
-
-	HOST_TO_LE_16(buff + 8, data[1].AXIS_X);
-	HOST_TO_LE_16(buff + 10, data[1].AXIS_Y);
-	HOST_TO_LE_16(buff + 12, data[1].AXIS_Z);
-
-	HOST_TO_LE_16(buff + 14, data[2].AXIS_X);
-	HOST_TO_LE_16(buff + 16, data[2].AXIS_Y);
-	HOST_TO_LE_16(buff + 18, data[2].AXIS_Z);
-#else
-	#error SEND_N_QUATERNIONS could be only 1,2,3
-#endif
-
-	ret = aci_gatt_update_char_value(
-		SWServW2STHandle, QuaternionsCharHandle, 0, 2 + 6 * SEND_N_QUATERNIONS, buff);
-	if (ret != BLE_STATUS_SUCCESS) {
-		PRINTF("Error while updating Sensor Fusion characteristic: 0x%02X\n", ret);
 		return BLE_STATUS_ERROR;
 	}
 
@@ -452,21 +376,26 @@ void Write_Request_CB(uint16_t handle, uint8_t *data, uint8_t length) {
 	}
 }
 
-tBleStatus BlueMS_Environmental_Update(int32_t press, int16_t temp) {
-	tBleStatus ret;
-	uint8_t buff[8];
-	HOST_TO_LE_16(buff, HAL_GetTick() >> 3);
-
-	HOST_TO_LE_32(buff + 2, press);
-	HOST_TO_LE_16(buff + 6, temp);
-
-	ret =
-		aci_gatt_update_char_value(HWServW2STHandle, EnvironmentalCharHandle, 0, 8, buff);
-
-	if (ret != BLE_STATUS_SUCCESS) {
-		PRINTF("Error while updating TEMP characteristic: 0x%04X\n", ret);
-		return BLE_STATUS_ERROR;
+void GAP_Device_Found_CB(void *data, uint16_t flag) {
+	tBDAddr addr;
+	if (flag == EVT_LE_ADVERTISING_REPORT) {
+		le_advertising_info *le_info = (le_advertising_info *)data;
+		for (int i = 0; i < 6; i++)
+			addr[i] = le_info->bdaddr[i];
+	} else {
+		evt_gap_device_found *evt_device = (evt_gap_device_found *)data;
+		for (int i = 0; i < 6; i++)
+			addr[i] = evt_device->bdaddr[i];
 	}
+	PRINTF("\rFound device %02x:%02x:%02x:%02x:%02x:%02x\n",
+		   addr[0],
+		   addr[1],
+		   addr[2],
+		   addr[3],
+		   addr[4],
+		   addr[5]);
+}
 
-	return BLE_STATUS_SUCCESS;
+void GAP_Procedure_Complete_CB(evt_gap_procedure_complete *data) {
+	PRINTF("---  End of Scan  ---\n\n");
 }

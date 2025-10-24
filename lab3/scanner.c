@@ -144,10 +144,10 @@ static void on_device_connect(gattlib_adapter_t* adapter,
 		printf("target characteristic not found\n");
 		goto EXIT;
 	}
-	uint16_t enable_notification = 0x10;
+	uint8_t enable_notification[] = {0x01, 0x00};
 	gattlib_write_char_by_handle(connection,
 								 target_characteristic.handle + 1,
-								 &enable_notification,
+								 enable_notification,
 								 sizeof(enable_notification));
 	ret = gattlib_register_notification(connection, notification_handler, NULL);
 	if (ret != GATTLIB_SUCCESS) {

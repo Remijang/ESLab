@@ -22,7 +22,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "bluenrg_aci_const.h"
 #include "bluenrg_def.h"
+#include "bluenrg_gap_aci.h"
 
 #define X_OFFSET 200
 #define Y_OFFSET 50
@@ -73,9 +75,11 @@ typedef union Char_UUID_t_s {
 tBleStatus Add_HWServW2ST_Service(void);
 tBleStatus Add_SWServW2ST_Service(void);
 void Read_Request_CB(uint16_t handle);
-tBleStatus BlueMS_Environmental_Update(int32_t press, int16_t temp);
 tBleStatus Acc_Update(AxesRaw_t *x_axes);
-tBleStatus Quat_Update(AxesRaw_t *q_axes);
+void Write_Request_CB(uint16_t handle, uint8_t *data, uint8_t length);
+
+void GAP_Device_Found_CB(void *data, uint16_t flag);
+void GAP_Procedure_Complete_CB(evt_gap_procedure_complete *data);
 
 extern uint8_t Services_Max_Attribute_Records[];
 

@@ -28,6 +28,7 @@
 #include "compiler.h"
 #include "gatt_db.h"
 #include "hci.h"
+#include "hci_const.h"
 #include "hci_le.h"
 #include "hci_tl.h"
 #include "link_layer.h"
@@ -147,7 +148,7 @@ void MX_BlueNRG_MS_Init(void) {
 		while (1)
 			;
 	}
-	PRINTF("Device address: %02x:%02x:%02x:%02x:%02x:%02x",
+	PRINTF("Device address: %02x:%02x:%02x:%02x:%02x:%02x\n",
 		   bdaddr[0],
 		   bdaddr[1],
 		   bdaddr[2],
@@ -163,14 +164,14 @@ void MX_BlueNRG_MS_Init(void) {
 
 	/* GAP Init */
 	if (bnrg_expansion_board == IDB05A1) {
-		ret = aci_gap_init_IDB05A1(GAP_PERIPHERAL_ROLE_IDB05A1,
+		ret = aci_gap_init_IDB05A1(GAP_CENTRAL_ROLE_IDB05A1,
 								   0,
 								   0x07,
 								   &service_handle,
 								   &dev_name_char_handle,
 								   &appearance_char_handle);
 	} else {
-		ret = aci_gap_init_IDB04A1(GAP_PERIPHERAL_ROLE_IDB04A1,
+		ret = aci_gap_init_IDB04A1(GAP_CENTRAL_ROLE_IDB04A1,
 								   &service_handle,
 								   &dev_name_char_handle,
 								   &appearance_char_handle);
@@ -230,6 +231,18 @@ void MX_BlueNRG_MS_Init(void) {
 	/* USER CODE END BlueNRG_MS_Init_PostTreatment */
 }
 
+void MX_Start_Scanning(void) {
+	uint16_t scanInterval = 0x4000;
+
+	tBleStatus ret = aci_gap_start_general_discovery_proc(
+		scanInterval, scanInterval, RANDOM_ADDR, 0x01);
+	if (ret != BLE_STATUS_SUCCESS) {
+		PRINTF("Error occurs\n");
+	} else {
+		PRINTF("--- Start of Scan ---\n\n");
+	}
+}
+
 /*
  * BlueNRG-MS background task
  */
@@ -238,7 +251,7 @@ void MX_BlueNRG_MS_Process(void) {
 
 	/* USER CODE END BlueNRG_MS_Process_PreTreatment */
 
-	User_Process();
+	// User_Process();
 	hci_user_evt_proc();
 
 	/* USER CODE BEGIN BlueNRG_MS_Process_PostTreatment */

@@ -150,6 +150,11 @@ void user_notify(void *pData) {
 					evt_le_connection_complete *cc = (void *)evt->data;
 					GAP_ConnectionComplete_CB(cc->peer_bdaddr, cc->handle);
 				} break;
+				case EVT_LE_ADVERTISING_REPORT: {
+					void *data = (void *)event_pckt->data;
+					GAP_Device_Found_CB(data, EVT_LE_ADVERTISING_REPORT);
+
+				} break;
 			}
 		} break;
 
@@ -164,6 +169,15 @@ void user_notify(void *pData) {
 					evt_gatt_attr_modified_IDB05A1 *pr = (void *)blue_evt->data;
 					Write_Request_CB(pr->attr_handle, pr->att_data, pr->data_length);
 				} break;
+				case EVT_BLUE_GAP_DEVICE_FOUND: {
+					void *data = (void *)event_pckt->data;
+					GAP_Device_Found_CB(data, EVT_BLUE_GAP_DEVICE_FOUND);
+				} break;
+				case EVT_BLUE_GAP_PROCEDURE_COMPLETE: {
+					evt_gap_procedure_complete *data =
+						(evt_gap_procedure_complete *)event_pckt->data;
+					GAP_Procedure_Complete_CB(data);
+				}
 			}
 
 		} break;

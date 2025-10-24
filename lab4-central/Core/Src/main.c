@@ -137,10 +137,10 @@ int main(void) {
 	MX_BlueNRG_MS_Init();
 	BSP_ACCELERO_Init();
 	ACC_InitGPIO();
+	MX_Start_Scanning();
 
 	/* USER CODE BEGIN 2 */
 	freq = 1;
-
 	osKernelInitialize();
 	semaphore = osSemaphoreNew(1U, 0U, &binarySem_attributes);
 	mutex = osMutexNew(&mutex_attributes);
@@ -627,7 +627,7 @@ void Task_ACC_Func(void *argument) {
 		x_axes.AXIS_Z = pDataXYZ[2];
 		MX_BlueNRG_MS_Process();
 		osDelay(osKernelGetTickFreq() / freq);
-		PRINTF("%d %d %d\n", x_axes.AXIS_X, x_axes.AXIS_Y, x_axes.AXIS_Z);
+		PRINTF("%ld %ld %ld\n", x_axes.AXIS_X, x_axes.AXIS_Y, x_axes.AXIS_Z);
 	}
 }
 /* USER CODE END 4 */
