@@ -25,6 +25,7 @@
 #include "bluenrg_gatt_aci.h"
 #include "bluenrg_hal_aci.h"
 #include "bluenrg_utils.h"
+#include "cmsis_os2.h"
 #include "compiler.h"
 #include "gatt_db.h"
 #include "hci.h"
@@ -64,7 +65,14 @@ uint8_t bdaddr[BDADDR_SIZE];
 static volatile uint8_t user_button_init_state = 1;
 static volatile uint8_t user_button_pressed = 0;
 const char complete_name[] = "Lab4OWO";
+const char CCCD_UUID[] = "00002902-0000-1000-8000-00805f9b34fb";
+const char TARGET_UUID[] = "11110000-1111-0000-1111-000011110000";
+const char TARGET_SERVICE_UUID[] = "00000000-0001-11e1-9ab4-0002a5d5c51b";
+const char TARGET_CHAR_UUID[] = "00e00000000111e1ac360002a5d5c51b";
+extern uint16_t connection_handle;
+
 uint8_t dev_bdaddr[BDADDR_SIZE];
+extern osSemaphoreId_t semaphore;
 
 /* USER CODE BEGIN PV */
 
@@ -105,7 +113,7 @@ void MX_BlueNRG_MS_Init(void) {
 	/* USER CODE END BlueNRG_MS_Init_PreTreatment */
 
 	/* Initialize the peripherals and the BLE Stack */
-	const char *name = "Lab4OWO";
+	const char *name = "Central";
 	uint16_t service_handle, dev_name_char_handle, appearance_char_handle;
 
 	uint8_t bdaddr_len_out;
@@ -186,43 +194,10 @@ void MX_BlueNRG_MS_Init(void) {
 		while (1)
 			;
 	}
-
-	ret = aci_gap_set_auth_requirement(
-		MITM_PROTECTION_REQUIRED, OOB_AUTH_DATA_ABSENT, NULL, 7, 16,
-		USE_FIXED_PIN_FOR_PAIRING, 123456, BONDING
-	);
-	if (ret) {
-		PRINTF("aci_gap_set_authentication_requirement failed.\n");
-		while (1)
-			;
-	}
-
 	PRINTF("BLE Stack Initialized\n");
-
-	ret = Add_HWServW2ST_Service();
-	if (ret == BLE_STATUS_SUCCESS) {
-		PRINTF("BlueMS HW service added successfully.\n");
-	} else {
-		PRINTF("Error while adding BlueMS HW service: 0x%02x\r\n", ret);
-		while (1)
-			;
-	}
-
-	ret = Add_SWServW2ST_Service();
-	if (ret == BLE_STATUS_SUCCESS) {
-		PRINTF("BlueMS SW service added successfully.\n");
-	} else {
-		PRINTF("Error while adding BlueMS HW service: 0x%02x\r\n", ret);
-		while (1)
-			;
-	}
 
 	/* Set output power level */
 	ret = aci_hal_set_tx_power_level(1, 4);
-
-	/* USER CODE BEGIN BlueNRG_MS_Init_PostTreatment */
-
-	/* USER CODE END BlueNRG_MS_Init_PostTreatment */
 }
 
 void MX_Start_Scanning(void) {
@@ -246,6 +221,29 @@ void MX_Stop_Scanning(void) {
 	}
 }
 
+void MX_Discover_Services(void) {
+	tBleStatus ret = aci_gatt_disc_all_prim_services(connection_handle);
+	if (ret != BLE_STATUS_SUCCESS)
+		PRINTF("Failed to start service discovery: 0x%02X\r\n", ret);
+	else
+		PRINTF("---  Start Discovering all services  ---\n");
+}
+
+void MX_Discover_Chars(uint16_t start_handle, uint16_t end_handle) {
+	tBleStatus ret =
+		aci_gatt_disc_all_char_of_service(connection_handle, start_handle, end_handle);
+	if (ret != BLE_STATUS_SUCCESS)
+		PRINTF(
+			"Failed to start char discovery (0x%04X–0x%04X): 0x%02X\r\n", start_handle,
+			end_handle, ret
+		);
+	else
+		PRINTF(
+			"Discovering characteristics in range 0x%04X–0x%04X\r\n", start_handle,
+			end_handle
+		);
+}
+
 void MX_Connect_Peripheral(void) {
 	tBleStatus ret;
 	uint16_t scanInterval = 0x0040;	 // 40 ms
@@ -255,7 +253,7 @@ void MX_Connect_Peripheral(void) {
 	uint8_t own_bdaddr_type = STATIC_RANDOM_ADDR;
 
 	uint16_t conn_min_interval = 0x0006;  // 7.5 ms
-	uint16_t conn_max_interval = 0x000C;  // 15 ms
+	uint16_t conn_max_interval = 0x0080;  // 15 ms
 	uint16_t conn_latency = 0x0000;
 	uint16_t supervision_timeout = 0x01F4;	// 500 (5s)
 	uint16_t min_conn_length = 0x0000;
@@ -276,10 +274,12 @@ void MX_Connect_Peripheral(void) {
 	}
 }
 
-/*
- * BlueNRG-MS background task
- */
-void MX_BlueNRG_MS_Process(void) {
+void MX_Read_Characteristic()
+
+	/*
+	 * BlueNRG-MS background task
+	 */
+	void MX_BlueNRG_MS_Process(void) {
 	hci_user_evt_proc();
 }
 

@@ -289,6 +289,7 @@ void GAP_Procedure_Complete_CB(evt_gap_procedure_complete *data) {
 	switch (data->procedure_code) {
 		case GAP_GENERAL_DISCOVERY_PROC:
 			PRINTF("---  End of Scan  ---\n\n");
+			osSemaphoreRelease(semaphore);
 			break;
 		default:
 			PRINTF("---  Procedure Complete: %d  ---\n\n", data->procedure_code);

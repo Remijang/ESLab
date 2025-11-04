@@ -652,7 +652,6 @@ void Scan(void *argument) {
 		MX_BlueNRG_MS_Process();
 		HAL_Delay(25);
 	}
-	osSemaphoreRelease(semaphore);
 	MX_Stop_Scanning();
 	while (1) {
 		osStatus_t ret = osSemaphoreAcquire(semaphore, 0);
@@ -661,7 +660,6 @@ void Scan(void *argument) {
 		MX_BlueNRG_MS_Process();
 		HAL_Delay(25);
 	}
-	osSemaphoreRelease(semaphore);
 	MX_Connect_Peripheral();
 	while (1) {
 		osStatus_t ret = osSemaphoreAcquire(semaphore, 0);

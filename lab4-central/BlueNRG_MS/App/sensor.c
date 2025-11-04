@@ -27,6 +27,7 @@
 #include "bluenrg_gap.h"
 #include "bluenrg_gap_aci.h"
 #include "bluenrg_gatt_aci.h"
+#include "cmsis_os2.h"
 #include "gatt_db.h"
 #include "hci_const.h"
 #include "hci_le.h"
@@ -47,6 +48,7 @@ __IO uint32_t connected = FALSE;
 
 extern uint16_t EnvironmentalCharHandle;
 extern uint16_t AccGyroMagCharHandle;
+extern osSemaphoreId_t semaphore;
 
 volatile uint8_t request_free_fall_notify = FALSE;
 
@@ -204,4 +206,5 @@ void GAP_ConnectionComplete_CB(uint8_t addr[6], uint16_t handle) {
 		PRINTF("%02X-", addr[i]);
 	}
 	PRINTF("%02X\n", addr[0]);
+	PRINTF("\n---  Connect Complete  ---\n");
 }

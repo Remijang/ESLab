@@ -32,6 +32,7 @@ void MX_BlueNRG_MS_Process(void);
 void MX_Start_Scanning(void);
 void MX_Stop_Scanning(void);
 void MX_Connect_Peripheral(void);
+void MX_Stop_Connecting(void);
 
 #ifdef __cplusplus
 }
