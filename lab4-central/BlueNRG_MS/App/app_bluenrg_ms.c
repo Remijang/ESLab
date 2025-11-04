@@ -32,6 +32,7 @@
 #include "hci_le.h"
 #include "hci_tl.h"
 #include "link_layer.h"
+#include "llist.h"
 #include "sensor.h"
 #include "sm.h"
 #include "stm32l475e_iot01_accelero.h"
@@ -63,6 +64,8 @@ uint8_t bnrg_expansion_board = IDB04A1;
 uint8_t bdaddr[BDADDR_SIZE];
 static volatile uint8_t user_button_init_state = 1;
 static volatile uint8_t user_button_pressed = 0;
+llist *adver_list;
+extern char complete_name[16];
 
 /* USER CODE BEGIN PV */
 
@@ -86,11 +89,10 @@ extern volatile uint32_t ms_counter;
  */
 void print_csv_time(void) {
 	uint32_t ms = HAL_GetTick();
-	PRINT_CSV("%02ld:%02ld:%02ld.%03ld",
-			  (long)(ms / (60 * 60 * 1000) % 24),
-			  (long)(ms / (60 * 1000) % 60),
-			  (long)((ms / 1000) % 60),
-			  (long)(ms % 1000));
+	PRINT_CSV(
+		"%02ld:%02ld:%02ld.%03ld", (long)(ms / (60 * 60 * 1000) % 24),
+		(long)(ms / (60 * 1000) % 60), (long)((ms / 1000) % 60), (long)(ms % 1000)
+	);
 }
 #endif
 
@@ -137,7 +139,8 @@ void MX_BlueNRG_MS_Init(void) {
 	}
 
 	ret = aci_hal_read_config_data(
-		CONFIG_DATA_RANDOM_ADDRESS, BDADDR_SIZE, &bdaddr_len_out, bdaddr);
+		CONFIG_DATA_RANDOM_ADDRESS, BDADDR_SIZE, &bdaddr_len_out, bdaddr
+	);
 
 	if (ret) {
 		PRINTF("Read Static Random address failed.\n");
@@ -148,13 +151,10 @@ void MX_BlueNRG_MS_Init(void) {
 		while (1)
 			;
 	}
-	PRINTF("Device address: %02x:%02x:%02x:%02x:%02x:%02x\n",
-		   bdaddr[0],
-		   bdaddr[1],
-		   bdaddr[2],
-		   bdaddr[3],
-		   bdaddr[4],
-		   bdaddr[5]);
+	PRINTF(
+		"Device address: %02x:%02x:%02x:%02x:%02x:%02x\n", bdaddr[0], bdaddr[1],
+		bdaddr[2], bdaddr[3], bdaddr[4], bdaddr[5]
+	);
 
 	/* GATT Init */
 	ret = aci_gatt_init();
@@ -164,17 +164,15 @@ void MX_BlueNRG_MS_Init(void) {
 
 	/* GAP Init */
 	if (bnrg_expansion_board == IDB05A1) {
-		ret = aci_gap_init_IDB05A1(GAP_CENTRAL_ROLE_IDB05A1,
-								   0,
-								   0x07,
-								   &service_handle,
-								   &dev_name_char_handle,
-								   &appearance_char_handle);
+		ret = aci_gap_init_IDB05A1(
+			GAP_CENTRAL_ROLE_IDB05A1, 0, 0x07, &service_handle, &dev_name_char_handle,
+			&appearance_char_handle
+		);
 	} else {
-		ret = aci_gap_init_IDB04A1(GAP_CENTRAL_ROLE_IDB04A1,
-								   &service_handle,
-								   &dev_name_char_handle,
-								   &appearance_char_handle);
+		ret = aci_gap_init_IDB04A1(
+			GAP_CENTRAL_ROLE_IDB04A1, &service_handle, &dev_name_char_handle,
+			&appearance_char_handle
+		);
 	}
 	if (ret != BLE_STATUS_SUCCESS) {
 		PRINTF("GAP_Init failed.\n");
@@ -182,21 +180,18 @@ void MX_BlueNRG_MS_Init(void) {
 
 	/* Update device name */
 	ret = aci_gatt_update_char_value(
-		service_handle, dev_name_char_handle, 0, strlen(name), (uint8_t *)name);
+		service_handle, dev_name_char_handle, 0, strlen(name), (uint8_t *)name
+	);
 	if (ret) {
 		PRINTF("aci_gatt_update_char_value failed.\n");
 		while (1)
 			;
 	}
 
-	ret = aci_gap_set_auth_requirement(MITM_PROTECTION_REQUIRED,
-									   OOB_AUTH_DATA_ABSENT,
-									   NULL,
-									   7,
-									   16,
-									   USE_FIXED_PIN_FOR_PAIRING,
-									   123456,
-									   BONDING);
+	ret = aci_gap_set_auth_requirement(
+		MITM_PROTECTION_REQUIRED, OOB_AUTH_DATA_ABSENT, NULL, 7, 16,
+		USE_FIXED_PIN_FOR_PAIRING, 123456, BONDING
+	);
 	if (ret) {
 		PRINTF("aci_gap_set_authentication_requirement failed.\n");
 		while (1)
@@ -232,16 +227,31 @@ void MX_BlueNRG_MS_Init(void) {
 }
 
 void MX_Start_Scanning(void) {
+	adver_list = llist_create(NULL);
 	uint16_t scanInterval = 0x4000;
-
 	tBleStatus ret = aci_gap_start_general_discovery_proc(
-		scanInterval, scanInterval, RANDOM_ADDR, 0x01);
+		scanInterval, scanInterval, STATIC_RANDOM_ADDR, 0x01
+	);
 	if (ret != BLE_STATUS_SUCCESS) {
 		PRINTF("Error occurs\n");
 	} else {
 		PRINTF("--- Start of Scan ---\n\n");
 	}
 }
+// void MX_Connect(void) {
+// 	tBleStatus ret = aci_gap_create_connection(
+// 		0x0040, 0x0040,
+// 		target_address_type,  // From the advertising report
+// 		target_address,		  // Peripheral MAC address
+// 		PUBLIC_ADDR,		  // Own address type
+// 		0x0028,				  // Conn interval min (50ms)
+// 		0x0038,				  // Conn interval max (70ms)
+// 		0x0000,				  // Conn latency
+// 		0x01F4,				  // Supervision timeout (500ms)
+// 		0x0000,				  // Min CE length
+// 		0x0000				  // Max CE length
+// 	);
+// }
 
 /*
  * BlueNRG-MS background task

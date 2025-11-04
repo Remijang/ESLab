@@ -20,6 +20,8 @@
 #include "main.h"
 
 #include "app_bluenrg_ms.h"
+#include "bluenrg_gap.h"
+#include "bluenrg_gap_aci.h"
 #include "cmsis_os2.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -74,6 +76,7 @@ const osSemaphoreAttr_t binarySem_attributes = {.name = "BinarySem"};
 osMutexId_t mutex;
 const osMutexAttr_t mutex_attributes = {.name = "Mutex"};
 uint16_t freq;
+char complete_name[16];
 
 extern AxesRaw_t x_axes;
 int16_t pDataXYZ[3];
@@ -140,7 +143,7 @@ int main(void) {
 	MX_Start_Scanning();
 
 	/* USER CODE BEGIN 2 */
-	freq = 1;
+	freq = 100;
 	osKernelInitialize();
 	semaphore = osSemaphoreNew(1U, 0U, &binarySem_attributes);
 	mutex = osMutexNew(&mutex_attributes);
@@ -425,24 +428,29 @@ static void MX_GPIO_Init(void) {
 	__HAL_RCC_GPIOD_CLK_ENABLE();
 
 	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(GPIOE,
-					  M24SR64_Y_RF_DISABLE_Pin | M24SR64_Y_GPO_Pin | ISM43362_RST_Pin,
-					  GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(
+		GPIOE, M24SR64_Y_RF_DISABLE_Pin | M24SR64_Y_GPO_Pin | ISM43362_RST_Pin,
+		GPIO_PIN_RESET
+	);
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(
-		GPIOA, ARD_D10_Pin | SPBTLE_RF_RST_Pin | ARD_D9_Pin, GPIO_PIN_RESET);
+		GPIOA, ARD_D10_Pin | SPBTLE_RF_RST_Pin | ARD_D9_Pin, GPIO_PIN_RESET
+	);
 
 	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(GPIOB,
-					  ARD_D8_Pin | ISM43362_BOOT0_Pin | ISM43362_WAKEUP_Pin |
-						  SPSGRF_915_SDN_Pin | ARD_D5_Pin,
-					  GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(
+		GPIOB,
+		ARD_D8_Pin | ISM43362_BOOT0_Pin | ISM43362_WAKEUP_Pin | SPSGRF_915_SDN_Pin |
+			ARD_D5_Pin,
+		GPIO_PIN_RESET
+	);
 
 	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(GPIOD,
-					  USB_OTG_FS_PWR_EN_Pin | PMOD_RESET_Pin | STSAFE_A100_RESET_Pin,
-					  GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(
+		GPIOD, USB_OTG_FS_PWR_EN_Pin | PMOD_RESET_Pin | STSAFE_A100_RESET_Pin,
+		GPIO_PIN_RESET
+	);
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(SPBTLE_RF_SPI3_CSN_GPIO_Port, SPBTLE_RF_SPI3_CSN_Pin, GPIO_PIN_SET);
@@ -452,7 +460,8 @@ static void MX_GPIO_Init(void) {
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(
-		SPSGRF_915_SPI3_CSN_GPIO_Port, SPSGRF_915_SPI3_CSN_Pin, GPIO_PIN_SET);
+		SPSGRF_915_SPI3_CSN_GPIO_Port, SPSGRF_915_SPI3_CSN_Pin, GPIO_PIN_SET
+	);
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(ISM43362_SPI3_CSN_GPIO_Port, ISM43362_SPI3_CSN_Pin, GPIO_PIN_SET);
@@ -621,15 +630,16 @@ void ACC_InitGPIO(void) {
 
 void Task_ACC_Func(void *argument) {
 	for (;;) {
-		BSP_ACCELERO_AccGetXYZ(pDataXYZ);
-		x_axes.AXIS_X = pDataXYZ[0];
-		x_axes.AXIS_Y = pDataXYZ[1];
-		x_axes.AXIS_Z = pDataXYZ[2];
+		// BSP_ACCELERO_AccGetXYZ(pDataXYZ);
+		// x_axes.AXIS_X = pDataXYZ[0];
+		// x_axes.AXIS_Y = pDataXYZ[1];
+		// x_axes.AXIS_Z = pDataXYZ[2];
 		MX_BlueNRG_MS_Process();
-		osDelay(osKernelGetTickFreq() / freq);
-		PRINTF("%ld %ld %ld\n", x_axes.AXIS_X, x_axes.AXIS_Y, x_axes.AXIS_Z);
+		// osDelay(osKernelGetTickFreq() / freq);
+		// PRINTF("%ld %ld %ld\n", x_axes.AXIS_X, x_axes.AXIS_Y, x_axes.AXIS_Z);
 	}
 }
+
 /* USER CODE END 4 */
 
 /**

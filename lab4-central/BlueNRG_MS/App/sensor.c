@@ -102,17 +102,11 @@ void Set_DeviceConnectable(void) {
 
 	PRINTF("Set General Discoverable Mode.\n");
 
-	ret = aci_gap_set_discoverable(ADV_DATA_TYPE,
-								   (ADV_INTERVAL_MIN_MS * 1000) / 625,
-								   (ADV_INTERVAL_MAX_MS * 1000) / 625,
-								   STATIC_RANDOM_ADDR,
-								   NO_WHITE_LIST_USE,
-								   sizeof(local_name),
-								   local_name,
-								   0,
-								   NULL,
-								   0,
-								   0);
+	ret = aci_gap_set_discoverable(
+		ADV_DATA_TYPE, (ADV_INTERVAL_MIN_MS * 1000) / 625,
+		(ADV_INTERVAL_MAX_MS * 1000) / 625, STATIC_RANDOM_ADDR, NO_WHITE_LIST_USE,
+		sizeof(local_name), local_name, 0, NULL, 0, 0
+	);
 
 	aci_gap_update_adv_data(26, manuf_data);
 
@@ -175,11 +169,10 @@ void user_notify(void *pData) {
 				} break;
 				case EVT_BLUE_GAP_PROCEDURE_COMPLETE: {
 					evt_gap_procedure_complete *data =
-						(evt_gap_procedure_complete *)event_pckt->data;
+						(evt_gap_procedure_complete *)blue_evt->data;
 					GAP_Procedure_Complete_CB(data);
-				}
+				} break;
 			}
-
 		} break;
 	}
 }

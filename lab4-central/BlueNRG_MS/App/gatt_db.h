@@ -80,7 +80,9 @@ void Write_Request_CB(uint16_t handle, uint8_t *data, uint8_t length);
 
 void GAP_Device_Found_CB(void *data, uint16_t flag);
 void GAP_Procedure_Complete_CB(evt_gap_procedure_complete *data);
+void parse_advertising_data(uint8_t *data, uint8_t data_length);
 
 extern uint8_t Services_Max_Attribute_Records[];
+extern char complete_name[16];
 
 #endif /* GATT_DB_H */
