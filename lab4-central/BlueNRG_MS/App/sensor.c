@@ -116,6 +116,14 @@ void Set_DeviceConnectable(void) {
 		PRINTF("aci_gap_set_discoverable() --> SUCCESS\r\n");
 }
 
+void dump_packet(hci_event_pckt *event_pckt) {
+	for (uint8_t i = 0; i < event_pckt->plen; i++) {
+		PRINTF("%02x", event_pckt->data[i]);
+		if ((i + 1) % 16 == 0)
+			PRINTF("\n");
+	}
+	PRINTF("\n");
+}
 /**
  * @brief  Callback processing the ACI events.
  * @note   Inside this function each event must be identified and correctly
@@ -127,7 +135,6 @@ void user_notify(void *pData) {
 	hci_uart_pckt *hci_pckt = pData;
 	/* obtain event packet */
 	hci_event_pckt *event_pckt = (hci_event_pckt *)hci_pckt->data;
-
 	if (hci_pckt->type != HCI_EVENT_PKT)
 		return;
 
@@ -135,7 +142,6 @@ void user_notify(void *pData) {
 		case EVT_DISCONN_COMPLETE: {
 			GAP_DisconnectionComplete_CB();
 		} break;
-
 		case EVT_LE_META_EVENT: {
 			evt_le_meta_event *evt = (void *)event_pckt->data;
 
@@ -145,13 +151,10 @@ void user_notify(void *pData) {
 					GAP_ConnectionComplete_CB(cc->peer_bdaddr, cc->handle);
 				} break;
 				case EVT_LE_ADVERTISING_REPORT: {
-					void *data = (void *)event_pckt->data;
-					GAP_Device_Found_CB(data, EVT_LE_ADVERTISING_REPORT);
-
+					GAP_Device_Found_CB(evt->data + 1);
 				} break;
 			}
 		} break;
-
 		case EVT_VENDOR: {
 			evt_blue_aci *blue_evt = (void *)event_pckt->data;
 			switch (blue_evt->ecode) {
@@ -162,10 +165,6 @@ void user_notify(void *pData) {
 				case EVT_BLUE_GATT_ATTRIBUTE_MODIFIED: {
 					evt_gatt_attr_modified_IDB05A1 *pr = (void *)blue_evt->data;
 					Write_Request_CB(pr->attr_handle, pr->att_data, pr->data_length);
-				} break;
-				case EVT_BLUE_GAP_DEVICE_FOUND: {
-					void *data = (void *)event_pckt->data;
-					GAP_Device_Found_CB(data, EVT_BLUE_GAP_DEVICE_FOUND);
 				} break;
 				case EVT_BLUE_GAP_PROCEDURE_COMPLETE: {
 					evt_gap_procedure_complete *data =

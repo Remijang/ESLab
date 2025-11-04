@@ -30,6 +30,8 @@ extern "C" {
 void MX_BlueNRG_MS_Init(void);
 void MX_BlueNRG_MS_Process(void);
 void MX_Start_Scanning(void);
+void MX_Stop_Scanning(void);
+void MX_Connect_Peripheral(void);
 
 #ifdef __cplusplus
 }

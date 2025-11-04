@@ -25,6 +25,8 @@
 #include "bluenrg_aci_const.h"
 #include "bluenrg_def.h"
 #include "bluenrg_gap_aci.h"
+#include "cmsis_os2.h"
+#include "sensor.h"
 
 #define X_OFFSET 200
 #define Y_OFFSET 50
@@ -78,11 +80,12 @@ void Read_Request_CB(uint16_t handle);
 tBleStatus Acc_Update(AxesRaw_t *x_axes);
 void Write_Request_CB(uint16_t handle, uint8_t *data, uint8_t length);
 
-void GAP_Device_Found_CB(void *data, uint16_t flag);
+void GAP_Device_Found_CB(uint8_t *data);
 void GAP_Procedure_Complete_CB(evt_gap_procedure_complete *data);
-void parse_advertising_data(uint8_t *data, uint8_t data_length);
+uint8_t parse_advertising_data(
+	uint8_t *data, uint8_t data_length, char *buf, uint8_t buf_len
+);
 
 extern uint8_t Services_Max_Attribute_Records[];
-extern char complete_name[16];
 
 #endif /* GATT_DB_H */

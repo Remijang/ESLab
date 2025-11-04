@@ -32,7 +32,6 @@
 #include "hci_le.h"
 #include "hci_tl.h"
 #include "link_layer.h"
-#include "llist.h"
 #include "sensor.h"
 #include "sm.h"
 #include "stm32l475e_iot01_accelero.h"
@@ -64,8 +63,8 @@ uint8_t bnrg_expansion_board = IDB04A1;
 uint8_t bdaddr[BDADDR_SIZE];
 static volatile uint8_t user_button_init_state = 1;
 static volatile uint8_t user_button_pressed = 0;
-llist *adver_list;
-extern char complete_name[16];
+const char complete_name[] = "Lab4OWO";
+uint8_t dev_bdaddr[BDADDR_SIZE];
 
 /* USER CODE BEGIN PV */
 
@@ -227,46 +226,61 @@ void MX_BlueNRG_MS_Init(void) {
 }
 
 void MX_Start_Scanning(void) {
-	adver_list = llist_create(NULL);
-	uint16_t scanInterval = 0x4000;
+	uint16_t scanInterval = 0x0010;
 	tBleStatus ret = aci_gap_start_general_discovery_proc(
 		scanInterval, scanInterval, STATIC_RANDOM_ADDR, 0x01
 	);
 	if (ret != BLE_STATUS_SUCCESS) {
 		PRINTF("Error occurs\n");
 	} else {
-		PRINTF("--- Start of Scan ---\n\n");
+		PRINTF("--- Start of Scan ---\n");
 	}
 }
-// void MX_Connect(void) {
-// 	tBleStatus ret = aci_gap_create_connection(
-// 		0x0040, 0x0040,
-// 		target_address_type,  // From the advertising report
-// 		target_address,		  // Peripheral MAC address
-// 		PUBLIC_ADDR,		  // Own address type
-// 		0x0028,				  // Conn interval min (50ms)
-// 		0x0038,				  // Conn interval max (70ms)
-// 		0x0000,				  // Conn latency
-// 		0x01F4,				  // Supervision timeout (500ms)
-// 		0x0000,				  // Min CE length
-// 		0x0000				  // Max CE length
-// 	);
-// }
+
+void MX_Stop_Scanning(void) {
+	tBleStatus ret = aci_gap_terminate_gap_procedure(GAP_GENERAL_DISCOVERY_PROC);
+	if (ret != BLE_STATUS_SUCCESS) {
+		PRINTF("Failed to stop scanning, error: 0x%02x\n", ret);
+	} else {
+		PRINTF("--- Stop Scanning ---\n");
+	}
+}
+
+void MX_Connect_Peripheral(void) {
+	tBleStatus ret;
+	uint16_t scanInterval = 0x0040;	 // 40 ms
+	uint16_t scanWindow = 0x0040;	 // 40 ms
+
+	uint8_t peer_bdaddr_type = RANDOM_ADDR;
+	uint8_t own_bdaddr_type = STATIC_RANDOM_ADDR;
+
+	uint16_t conn_min_interval = 0x0006;  // 7.5 ms
+	uint16_t conn_max_interval = 0x000C;  // 15 ms
+	uint16_t conn_latency = 0x0000;
+	uint16_t supervision_timeout = 0x01F4;	// 500 (5s)
+	uint16_t min_conn_length = 0x0000;
+	uint16_t max_conn_length = 0xFFFF;
+
+	PRINTF("\n--  Start Connecting to peripheral  ---\n");
+
+	ret = aci_gap_create_connection(
+		scanInterval, scanWindow, peer_bdaddr_type, dev_bdaddr, own_bdaddr_type,
+		conn_min_interval, conn_max_interval, conn_latency, supervision_timeout,
+		min_conn_length, max_conn_length
+	);
+
+	if (ret == BLE_STATUS_SUCCESS) {
+		PRINTF("aci_gap_create_connection: OK\n");
+	} else {
+		PRINTF("aci_gap_create_connection failed (0x%02X)\n", ret);
+	}
+}
 
 /*
  * BlueNRG-MS background task
  */
 void MX_BlueNRG_MS_Process(void) {
-	/* USER CODE BEGIN BlueNRG_MS_Process_PreTreatment */
-
-	/* USER CODE END BlueNRG_MS_Process_PreTreatment */
-
-	// User_Process();
 	hci_user_evt_proc();
-
-	/* USER CODE BEGIN BlueNRG_MS_Process_PostTreatment */
-
-	/* USER CODE END BlueNRG_MS_Process_PostTreatment */
 }
 
 /**

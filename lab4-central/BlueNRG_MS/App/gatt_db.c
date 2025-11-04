@@ -27,7 +27,6 @@
 #include "bluenrg_gap.h"
 #include "bluenrg_gap_aci.h"
 #include "bluenrg_gatt_aci.h"
-#include "llist.h"
 
 /** @brief Macro that stores Value into a buffer in Little Endian Format (2 bytes)*/
 #define HOST_TO_LE_16(buf, val) \
@@ -109,7 +108,10 @@ extern uint32_t freq;
 
 extern uint16_t connection_handle;
 extern uint32_t start_time;
-extern llist *adver_list;
+
+extern uint8_t dev_bdaddr[BDADDR_SIZE];
+extern const char complete_name[];
+extern osSemaphoreId_t semaphore;
 
 /**
  * @brief  Add the 'HW' service (and the Environmental and AccGyr characteristics).
@@ -265,58 +267,43 @@ void Write_Request_CB(uint16_t handle, uint8_t *data, uint8_t length) {
 	}
 }
 
-void GAP_Device_Found_CB(void *data, uint16_t flag) {
-	tBDAddr addr;
-	llist_push(adver_list, data);
-	if (flag == EVT_LE_ADVERTISING_REPORT) {
-		le_advertising_info *le_info = (le_advertising_info *)data;
+void GAP_Device_Found_CB(uint8_t *data) {
+	le_advertising_info *le_info = (le_advertising_info *)data;
+	static char buf[16];
+
+	uint8_t ret =
+		parse_advertising_data(le_info->data_RSSI, le_info->data_length, buf, 16);
+	if (ret == 1 && strncmp(buf, complete_name, strlen(complete_name)) == 0) {
 		for (int i = 0; i < 6; i++)
-			addr[i] = le_info->bdaddr[i];
-	} else {
-		evt_gap_device_found *evt_device = (evt_gap_device_found *)data;
-		for (int i = 0; i < 6; i++)
-			addr[i] = evt_device->bdaddr[i];
+			dev_bdaddr[i] = le_info->bdaddr[i];
+		PRINTF(
+			"Found device %02x:%02x:%02x:%02x:%02x:%02x, complete name: %s\n",
+			dev_bdaddr[0], dev_bdaddr[1], dev_bdaddr[2], dev_bdaddr[3], dev_bdaddr[4],
+			dev_bdaddr[5], buf
+		);
+		osSemaphoreRelease(semaphore);
 	}
-	PRINTF(
-		"\rFound device %02x:%02x:%02x:%02x:%02x:%02x\n", addr[0], addr[1], addr[2],
-		addr[3], addr[4], addr[5]
-	);
 }
 
 void GAP_Procedure_Complete_CB(evt_gap_procedure_complete *data) {
 	switch (data->procedure_code) {
 		case GAP_GENERAL_DISCOVERY_PROC:
 			PRINTF("---  End of Scan  ---\n\n");
-
-		case GAP_NAME_DISCOVERY_PROC:
-			PRINTF("---  Name Discovered ---\n\n");
 			break;
 		default:
+			PRINTF("---  Procedure Complete: %d  ---\n\n", data->procedure_code);
 			return;
 	}
-	tBDAddr addr;
-	void *data = NULL;
-	if ((data = llist_pop(adver_list)) == NULL)
-		return;
-	le_advertising_info *le_info = (le_advertising_info *)data;
-	for (int i = 0; i < 6; i++)
-		addr[i] = le_info->bdaddr[i];
-	tBleStatus ret = aci_gap_start_name_discovery_proc(
-		0x0050, 0x0030, RANDOM_ADDR, addr, STATIC_RANDOM_ADDR, 0x0010, 0x0020, 0x0000,
-		0x0100, 0x0000, 0xffff
-	);
-	if (ret == BLE_STATUS_TIMEOUT)
-		PRINTF("Request Timeout\n");
-	else if (ret != BLE_STATUS_SUCCESS)
-		PRINTF("Fail to name discovery, error code %04x\n\n", ret);
-	break;
 }
 
-void parse_advertising_data(uint8_t *data, uint8_t data_length) {
+uint8_t parse_advertising_data(
+	uint8_t *data, uint8_t data_length, char *buf, uint8_t buf_len
+) {
+	if (data == 0) {
+		PRINTF("No complete name found.\n");
+		return 0;
+	}
 	uint8_t index = 0;
-	// for (int i = 0; i < data_length; i++) {
-	// 	PRINTF("%02x ", data[i]);
-	// }
 	while (index < data_length - 1) {  // -1 to avoid reading RSSI
 		uint8_t field_length = data[index];
 		if (field_length == 0)
@@ -326,15 +313,16 @@ void parse_advertising_data(uint8_t *data, uint8_t data_length) {
 
 		if (ad_type == 0x09 || ad_type == 0x08) {  // Complete Local Name
 			uint8_t name_len = field_length - 1;
-			if (name_len > sizeof(complete_name) - 1)
-				name_len = sizeof(complete_name) - 1;
-			memcpy(complete_name, &data[index + 2], name_len);
-			complete_name[name_len] = '\0';
-			PRINTF("Device name: %s\n", complete_name);
-			return;
+			if (name_len > buf_len - 1)
+				name_len = buf_len - 1;
+			memcpy(buf, &data[index + 2], name_len);
+			buf[name_len] = '\0';
+			PRINTF("Device name: %s\n", buf);
+			return 1;
 		}
 
 		index += field_length + 1;	// Move to next AD structure
 	}
 	PRINTF("No complete name found.\n");
+	return 0;
 }

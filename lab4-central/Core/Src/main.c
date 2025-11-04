@@ -23,6 +23,7 @@
 #include "bluenrg_gap.h"
 #include "bluenrg_gap_aci.h"
 #include "cmsis_os2.h"
+#include "hci_tl_interface.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -60,7 +61,7 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 osThreadId_t tid1;
 const osThreadAttr_t task1_attributes = {
-	.name = "Task_BLE",
+	.name = "Task_Scan",
 	.stack_size = 256 * 4,
 	.priority = (osPriority_t)osPriorityNormal,
 };
@@ -76,7 +77,6 @@ const osSemaphoreAttr_t binarySem_attributes = {.name = "BinarySem"};
 osMutexId_t mutex;
 const osMutexAttr_t mutex_attributes = {.name = "Mutex"};
 uint16_t freq;
-char complete_name[16];
 
 extern AxesRaw_t x_axes;
 int16_t pDataXYZ[3];
@@ -95,6 +95,7 @@ static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_TIM16_Init(void);
 void ACC_InitGPIO(void);
 void Task_ACC_Func(void *argument);
+void Scan(void *argument);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -140,16 +141,16 @@ int main(void) {
 	MX_BlueNRG_MS_Init();
 	BSP_ACCELERO_Init();
 	ACC_InitGPIO();
-	MX_Start_Scanning();
 
-	/* USER CODE BEGIN 2 */
-	freq = 100;
+	// /* USER CODE BEGIN 2 */
+	// freq = 100;
 	osKernelInitialize();
 	semaphore = osSemaphoreNew(1U, 0U, &binarySem_attributes);
-	mutex = osMutexNew(&mutex_attributes);
-	tid2 = osThreadNew(Task_ACC_Func, NULL, &task2_attributes);
+	// mutex = osMutexNew(&mutex_attributes);
+	tid1 = osThreadNew(Scan, NULL, &task1_attributes);
+	// tid2 = osThreadNew(Task_ACC_Func, NULL, &task2_attributes);
 	osKernelStart();
-
+	// Scan();
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
@@ -605,6 +606,8 @@ static void MX_GPIO_Init(void) {
 	GPIO_InitStruct.Alternate = GPIO_AF4_I2C1;
 	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+	HCI_TL_SPI_Init(NULL);
+
 	/* EXTI interrupt init*/
 	HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
 	HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
@@ -634,9 +637,38 @@ void Task_ACC_Func(void *argument) {
 		// x_axes.AXIS_X = pDataXYZ[0];
 		// x_axes.AXIS_Y = pDataXYZ[1];
 		// x_axes.AXIS_Z = pDataXYZ[2];
+		osThreadYield();
 		MX_BlueNRG_MS_Process();
-		// osDelay(osKernelGetTickFreq() / freq);
+		osDelay(osKernelGetTickCount() / 10);
 		// PRINTF("%ld %ld %ld\n", x_axes.AXIS_X, x_axes.AXIS_Y, x_axes.AXIS_Z);
+	}
+}
+void Scan(void *argument) {
+	MX_Start_Scanning();
+	while (1) {
+		osStatus_t ret = osSemaphoreAcquire(semaphore, 0);
+		if (ret == osOK)
+			break;
+		MX_BlueNRG_MS_Process();
+		HAL_Delay(25);
+	}
+	osSemaphoreRelease(semaphore);
+	MX_Stop_Scanning();
+	while (1) {
+		osStatus_t ret = osSemaphoreAcquire(semaphore, 0);
+		if (ret == osOK)
+			break;
+		MX_BlueNRG_MS_Process();
+		HAL_Delay(25);
+	}
+	osSemaphoreRelease(semaphore);
+	MX_Connect_Peripheral();
+	while (1) {
+		osStatus_t ret = osSemaphoreAcquire(semaphore, 0);
+		if (ret == osOK)
+			break;
+		MX_BlueNRG_MS_Process();
+		HAL_Delay(25);
 	}
 }
 
