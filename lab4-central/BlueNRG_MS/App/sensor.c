@@ -191,6 +191,11 @@ void user_notify(void *pData) {
 						(evt_gap_procedure_complete *)blue_evt->data;
 					GAP_Procedure_Complete_CB(data);
 				} break;
+				case EVT_BLUE_GATT_NOTIFICATION: {
+					evt_gatt_attr_notification *data =
+						(evt_gatt_attr_notification *)blue_evt->data;
+					Notification_Handler(data);
+				}
 			}
 		} break;
 	}
@@ -344,9 +349,16 @@ bool Is_Identical_UUID(UUID_t uuid1, UUID_t uuid2, uint8_t type, bool reverse) {
 		case UUID_TYPE_16:
 			if (reverse)
 				uuid2.UUID_16 = (uuid2.UUID_16 >> 8) + (uuid2.UUID_16 << 8);
-			PRINTF("    Debug: %04X %04X", uuid1.UUID_16, uuid2.UUID_16);
 			return uuid1.UUID_16 == uuid2.UUID_16;
 		default:
 			return false;
 	}
+}
+
+void Notification_Handler(evt_gatt_attr_notification *data) {
+	PRINTF("    Get Notification: ");
+	for (int i = 0; i < data->event_data_length - 2; i++) {
+		PRINTF("%02X", data->attr_value[i]);
+	}
+	PRINTF("\n");
 }

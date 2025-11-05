@@ -693,12 +693,10 @@ void Scan(void *argument) {
 	msg--;
 	FrequencyHandle = DiscoveredHandle;
 	MX_Enable_Notification(AcceleratoHandle);
-	// while (1) {
-	// 	if (msg == 1)
-	// 		break;
-	// 	MX_BlueNRG_MS_Process();
-	// 	HAL_Delay(25);
-	// }
+	while (1) {
+		MX_BlueNRG_MS_Process();
+		HAL_Delay(25);
+	}
 }
 
 /* USER CODE END 4 */

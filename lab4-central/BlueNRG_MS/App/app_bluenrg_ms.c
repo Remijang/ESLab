@@ -287,9 +287,9 @@ void MX_Enable_Notification(uint16_t char_handle) {
 	tBleStatus ret =
 		aci_gatt_disc_all_charac_descriptors(connection_handle, char_handle, 0xFFFF);
 	if (ret != BLE_STATUS_SUCCESS)
-		PRINTF("Failed to enable notification: 0x%02X\r\n", ret);
+		PRINTF("Failed to find notification handle: 0x%02X\r\n", ret);
 	else
-		PRINTF("---  Start Enabling Notification ---\n");
+		PRINTF("---  Finding Notification Handle ---\n");
 	while (1) {
 		if (msg == 1)
 			break;
@@ -297,7 +297,25 @@ void MX_Enable_Notification(uint16_t char_handle) {
 		HAL_Delay(25);
 	}
 	msg--;
+	if (DiscoveredHandle == 0x0000) {
+		PRINTF("    Notification Handle Not Found\n");
+		exit(1);
+		return;
+	}
 	PRINTF("    Find notification handle: %04X\n", DiscoveredHandle);
+	uint8_t data[2] = {0x01, 0x00};
+	ret = aci_gatt_write_charac_value(connection_handle, DiscoveredHandle, 2, data);
+	if (ret != BLE_STATUS_SUCCESS)
+		PRINTF("Failed to enable notification: 0x%02X\r\n", ret);
+	else
+		PRINTF("--- Start Writing 0x0100 to Notification Handle ---\n");
+	while (1) {
+		if (msg == 1)
+			break;
+		MX_BlueNRG_MS_Process();
+		HAL_Delay(25);
+	}
+	msg--;
 }
 
 /*
@@ -347,13 +365,13 @@ static void User_Process(void) {
 #endif
 		BSP_LED_Toggle(LED2);
 
-		if (connected) {
-			Acc_Update(&x_axes);
+// 		if (connected) {
+// 			Acc_Update(&x_axes);
 
-#if !USE_BUTTON
-			HAL_Delay(100); /* wait 1 sec before sending new data */
-#endif
-		}
+// #if !USE_BUTTON
+// 			HAL_Delay(100); /* wait 1 sec before sending new data */
+// #endif
+// 		}
 #if USE_BUTTON
 		/* Reset the User Button flag */
 		user_button_pressed = 0;
