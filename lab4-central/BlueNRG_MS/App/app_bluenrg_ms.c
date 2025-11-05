@@ -19,7 +19,13 @@
 /* Includes ------------------------------------------------------------------*/
 #include "app_bluenrg_ms.h"
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "b_l475e_iot01a1.h"
+#include "bluenrg_conf.h"
+#include "bluenrg_def.h"
 #include "bluenrg_gap.h"
 #include "bluenrg_gap_aci.h"
 #include "bluenrg_gatt_aci.h"
@@ -27,7 +33,6 @@
 #include "bluenrg_utils.h"
 #include "cmsis_os2.h"
 #include "compiler.h"
-#include "gatt_db.h"
 #include "hci.h"
 #include "hci_const.h"
 #include "hci_le.h"
@@ -50,33 +55,40 @@
 #define USE_BUTTON 0
 
 /* Private macros ------------------------------------------------------------*/
+/** @brief Macro that stores Value into a buffer in Little Endian Format (2 bytes)*/
+#define HOST_TO_LE_16(buf, val) \
+	(((buf)[0] = (uint8_t)(val)), ((buf)[1] = (uint8_t)(val >> 8)))
+
+/** @brief Macro that stores Value into a buffer in Little Endian Format (4 bytes) */
+#define HOST_TO_LE_32(buf, val)                                     \
+	(((buf)[0] = (uint8_t)(val)), ((buf)[1] = (uint8_t)(val >> 8)), \
+	 ((buf)[2] = (uint8_t)(val >> 16)), ((buf)[3] = (uint8_t)(val >> 24)))
 
 /* Private variables ---------------------------------------------------------*/
+extern uint32_t freq;
+
+uint8_t target_type;
+UUID_t target_uuid;
+extern uint16_t DiscoveredHandle;
 extern AxesRaw_t x_axes;
-extern AxesRaw_t g_axes;
-extern AxesRaw_t m_axes;
-extern AxesRaw_t q_axes;
+
+extern uint16_t connection_handle;
+extern uint32_t start_time;
+
+uint8_t dev_bdaddr[BDADDR_SIZE];
+const char complete_name[] = "Lab4OWO";
 
 extern volatile uint8_t set_connectable;
 extern volatile int connected;
+extern uint16_t connection_handle;
+
 /* at startup, suppose the X-NUCLEO-IDB04A1 is used */
 uint8_t bnrg_expansion_board = IDB04A1;
 uint8_t bdaddr[BDADDR_SIZE];
 static volatile uint8_t user_button_init_state = 1;
 static volatile uint8_t user_button_pressed = 0;
-const char complete_name[] = "Lab4OWO";
-const char CCCD_UUID[] = "00002902-0000-1000-8000-00805f9b34fb";
-const char TARGET_UUID[] = "11110000-1111-0000-1111-000011110000";
-const char TARGET_SERVICE_UUID[] = "00000000-0001-11e1-9ab4-0002a5d5c51b";
-const char TARGET_CHAR_UUID[] = "00e00000000111e1ac360002a5d5c51b";
-extern uint16_t connection_handle;
 
-uint8_t dev_bdaddr[BDADDR_SIZE];
-extern osSemaphoreId_t semaphore;
-
-/* USER CODE BEGIN PV */
-
-/* USER CODE END PV */
+extern uint8_t msg;
 
 /* Private function prototypes -----------------------------------------------*/
 static void User_Process(void);
@@ -103,34 +115,46 @@ void print_csv_time(void) {
 }
 #endif
 
+// /**
+//  * @brief  Update acceleration characteristic value
+//  * @param  AxesRaw_t structure containing acceleration value in mg.
+//  * @retval tBleStatus Status
+//  */
+// tBleStatus Acc_Update(AxesRaw_t *x_axes) {
+// 	uint8_t buff[2 + 2 * 3];
+// 	tBleStatus ret;
+
+// 	HOST_TO_LE_16(buff, (HAL_GetTick() >> 3));
+
+// 	HOST_TO_LE_16(buff + 2, (uint16_t)x_axes->AXIS_X);
+// 	HOST_TO_LE_16(buff + 4, (uint16_t)x_axes->AXIS_Y);
+// 	HOST_TO_LE_16(buff + 6, (uint16_t)x_axes->AXIS_Z);
+
+// 	ret = aci_gatt_update_char_value_ext_IDB05A1(
+// 		HWServW2STHandle, AccGyroMagCharHandle, NOTIFICATION, 8, 0, 2 + 2 * 3, buff
+// 	);
+// 	if (ret != BLE_STATUS_SUCCESS) {
+// 		PRINTF("Error while updating Acceleration characteristic: 0x%02X\n", ret);
+// 		return BLE_STATUS_ERROR;
+// 	}
+
+// 	return BLE_STATUS_SUCCESS;
+// }
+
 void MX_BlueNRG_MS_Init(void) {
-	/* USER CODE BEGIN SV */
-
-	/* USER CODE END SV */
-
-	/* USER CODE BEGIN BlueNRG_MS_Init_PreTreatment */
-
-	/* USER CODE END BlueNRG_MS_Init_PreTreatment */
-
 	/* Initialize the peripherals and the BLE Stack */
 	const char *name = "Central";
 	uint16_t service_handle, dev_name_char_handle, appearance_char_handle;
-
 	uint8_t bdaddr_len_out;
 	uint8_t hwVersion;
 	uint16_t fwVersion;
 	int ret;
-
 	User_Init();
-
 	/* Get the User Button initial state */
 	user_button_init_state = BSP_PB_GetState(BUTTON_KEY);
-
 	hci_init(user_notify, NULL);
-
 	/* get the BlueNRG HW and FW versions */
 	getBlueNRGVersion(&hwVersion, &fwVersion);
-
 	/*
 	 * Reset BlueNRG again otherwise we won't
 	 * be able to change its MAC address.
@@ -139,30 +163,24 @@ void MX_BlueNRG_MS_Init(void) {
 	 */
 	hci_reset();
 	HAL_Delay(100);
-
 	PRINTF("HWver %d\nFWver %d\n", hwVersion, fwVersion);
 	if (hwVersion > 0x30) { /* X-NUCLEO-IDB05A1 expansion board is used */
 		bnrg_expansion_board = IDB05A1;
 	}
-
 	ret = aci_hal_read_config_data(
 		CONFIG_DATA_RANDOM_ADDRESS, BDADDR_SIZE, &bdaddr_len_out, bdaddr
 	);
-
 	if (ret) {
 		PRINTF("Read Static Random address failed.\n");
 	}
-
 	if ((bdaddr[5] & 0xC0) != 0xC0) {
 		PRINTF("Static Random address not well formed.\n");
-		while (1)
-			;
+		while (1) {}
 	}
 	PRINTF(
-		"Device address: %02x:%02x:%02x:%02x:%02x:%02x\n", bdaddr[0], bdaddr[1],
+		"Device address: %02X:%02X:%02X:%02X:%02X:%02X\n", bdaddr[0], bdaddr[1],
 		bdaddr[2], bdaddr[3], bdaddr[4], bdaddr[5]
 	);
-
 	/* GATT Init */
 	ret = aci_gatt_init();
 	if (ret) {
@@ -184,18 +202,15 @@ void MX_BlueNRG_MS_Init(void) {
 	if (ret != BLE_STATUS_SUCCESS) {
 		PRINTF("GAP_Init failed.\n");
 	}
-
 	/* Update device name */
 	ret = aci_gatt_update_char_value(
 		service_handle, dev_name_char_handle, 0, strlen(name), (uint8_t *)name
 	);
 	if (ret) {
 		PRINTF("aci_gatt_update_char_value failed.\n");
-		while (1)
-			;
+		while (1) {}
 	}
 	PRINTF("BLE Stack Initialized\n");
-
 	/* Set output power level */
 	ret = aci_hal_set_tx_power_level(1, 4);
 }
@@ -215,33 +230,10 @@ void MX_Start_Scanning(void) {
 void MX_Stop_Scanning(void) {
 	tBleStatus ret = aci_gap_terminate_gap_procedure(GAP_GENERAL_DISCOVERY_PROC);
 	if (ret != BLE_STATUS_SUCCESS) {
-		PRINTF("Failed to stop scanning, error: 0x%02x\n", ret);
+		PRINTF("Failed to stop scanning, error: 0x%02X\n", ret);
 	} else {
 		PRINTF("--- Stop Scanning ---\n");
 	}
-}
-
-void MX_Discover_Services(void) {
-	tBleStatus ret = aci_gatt_disc_all_prim_services(connection_handle);
-	if (ret != BLE_STATUS_SUCCESS)
-		PRINTF("Failed to start service discovery: 0x%02X\r\n", ret);
-	else
-		PRINTF("---  Start Discovering all services  ---\n");
-}
-
-void MX_Discover_Chars(uint16_t start_handle, uint16_t end_handle) {
-	tBleStatus ret =
-		aci_gatt_disc_all_char_of_service(connection_handle, start_handle, end_handle);
-	if (ret != BLE_STATUS_SUCCESS)
-		PRINTF(
-			"Failed to start char discovery (0x%04X–0x%04X): 0x%02X\r\n", start_handle,
-			end_handle, ret
-		);
-	else
-		PRINTF(
-			"Discovering characteristics in range 0x%04X–0x%04X\r\n", start_handle,
-			end_handle
-		);
 }
 
 void MX_Connect_Peripheral(void) {
@@ -274,12 +266,44 @@ void MX_Connect_Peripheral(void) {
 	}
 }
 
-void MX_Read_Characteristic()
+void MX_Discover_Characteristic(uint8_t uuid_type, const uint8_t *uuid) {
+	tBleStatus ret =
+		aci_gatt_disc_charac_by_uuid(connection_handle, 0x0001, 0xffff, uuid_type, uuid);
+	if (ret != BLE_STATUS_SUCCESS)
+		PRINTF("Failed to start characteristic discovery by UUID: 0x%02X\r\n", ret);
+	else {
+		PRINTF("---  Start Discovering characteristic: ");
+		for (int i = 0; i < 16; i++) {
+			PRINTF("%02X", uuid[i]);
+		}
+		PRINTF("  ---\n");
+	}
+}
 
-	/*
-	 * BlueNRG-MS background task
-	 */
-	void MX_BlueNRG_MS_Process(void) {
+void MX_Enable_Notification(uint16_t char_handle) {
+	target_type = UUID_TYPE_16;
+	target_uuid.UUID_16 = 0x2902;
+	DiscoveredHandle = 0x0000;
+	tBleStatus ret =
+		aci_gatt_disc_all_charac_descriptors(connection_handle, char_handle, 0xFFFF);
+	if (ret != BLE_STATUS_SUCCESS)
+		PRINTF("Failed to enable notification: 0x%02X\r\n", ret);
+	else
+		PRINTF("---  Start Enabling Notification ---\n");
+	while (1) {
+		if (msg == 1)
+			break;
+		MX_BlueNRG_MS_Process();
+		HAL_Delay(25);
+	}
+	msg--;
+	PRINTF("    Find notification handle: %04X\n", DiscoveredHandle);
+}
+
+/*
+ * BlueNRG-MS background task
+ */
+void MX_BlueNRG_MS_Process(void) {
 	hci_user_evt_proc();
 }
 
@@ -292,7 +316,6 @@ void MX_Read_Characteristic()
 static void User_Init(void) {
 	BSP_PB_Init(BUTTON_KEY, BUTTON_MODE_EXTI);
 	BSP_LED_Init(LED2);
-
 	BSP_COM_Init(COM1);
 }
 

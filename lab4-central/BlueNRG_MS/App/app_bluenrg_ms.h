@@ -25,6 +25,32 @@ extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
+#include <stdint.h>
+#include <stdlib.h>
+
+#include "bluenrg_aci_const.h"
+#include "bluenrg_def.h"
+#include "bluenrg_gap_aci.h"
+#include "cmsis_os2.h"
+#include "sensor.h"
+
+#define COPY_ACC_GYRO_MAG_W2ST_CHAR_UUID(uuid_struct)                                  \
+	COPY_UUID_128(                                                                     \
+		uuid_struct, 0x00, 0xE0, 0x00, 0x00, 0x00, 0x01, 0x11, 0xe1, 0xac, 0x36, 0x00, \
+		0x02, 0xa5, 0xd5, 0xc5, 0x1b                                                   \
+	)
+
+#define COPY_SAMPLE_FREQUENCY_CHAR_UUID(uuid_struct)                                   \
+	COPY_UUID_128(                                                                     \
+		uuid_struct, 0x11, 0x11, 0x00, 0x00, 0x11, 0x11, 0x00, 0x00, 0x11, 0x11, 0x00, \
+		0x00, 0x11, 0x11, 0x00, 0x00                                                   \
+	)
+
+#define COPY_CCCD_UUID(uuid_struct)                                                    \
+	COPY_UUID_128(                                                                     \
+		uuid_struct, 0x00, 0x00, 0x29, 0x02, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, \
+		0x80, 0x5f, 0x9b, 0x34, 0xfb                                                   \
+	)
 
 /* Exported Functions --------------------------------------------------------*/
 void MX_BlueNRG_MS_Init(void);
@@ -32,8 +58,26 @@ void MX_BlueNRG_MS_Process(void);
 void MX_Start_Scanning(void);
 void MX_Stop_Scanning(void);
 void MX_Connect_Peripheral(void);
-void MX_Stop_Connecting(void);
+void MX_Discover_Characteristic(uint8_t uuid_type, const uint8_t *uuid);
 
+#define X_OFFSET 200
+#define Y_OFFSET 50
+#define Z_OFFSET 1000
+
+/**
+ * @brief Number of application services
+ */
+#define NUMBER_OF_APPLICATION_SERVICES (2)
+
+/**
+ * @brief Define How Many quaterions you want to transmit (from 1 to 3)
+ *        In this sample application use only 1
+ */
+#define SEND_N_QUATERNIONS 1
+
+enum { ACCELERATION_SERVICE_INDEX = 0, ENVIRONMENTAL_SERVICE_INDEX = 1 };
+
+extern uint8_t Services_Max_Attribute_Records[];
 #ifdef __cplusplus
 }
 #endif

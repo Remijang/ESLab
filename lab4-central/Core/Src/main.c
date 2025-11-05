@@ -22,6 +22,7 @@
 #include "app_bluenrg_ms.h"
 #include "bluenrg_gap.h"
 #include "bluenrg_gap_aci.h"
+#include "bluenrg_gatt_server.h"
 #include "cmsis_os2.h"
 #include "hci_tl_interface.h"
 
@@ -73,6 +74,7 @@ const osThreadAttr_t task2_attributes = {
 	.priority = (osPriority_t)osPriorityNormal,
 };
 osSemaphoreId_t semaphore;
+uint8_t msg = 0;
 const osSemaphoreAttr_t binarySem_attributes = {.name = "BinarySem"};
 osMutexId_t mutex;
 const osMutexAttr_t mutex_attributes = {.name = "Mutex"};
@@ -80,6 +82,7 @@ uint16_t freq;
 
 extern AxesRaw_t x_axes;
 int16_t pDataXYZ[3];
+uint16_t AcceleratoHandle, FrequencyHandle, DiscoveredHandle;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -646,28 +649,56 @@ void Task_ACC_Func(void *argument) {
 void Scan(void *argument) {
 	MX_Start_Scanning();
 	while (1) {
-		osStatus_t ret = osSemaphoreAcquire(semaphore, 0);
-		if (ret == osOK)
+		if (msg == 1)
 			break;
 		MX_BlueNRG_MS_Process();
 		HAL_Delay(25);
 	}
+	msg--;
 	MX_Stop_Scanning();
 	while (1) {
-		osStatus_t ret = osSemaphoreAcquire(semaphore, 0);
-		if (ret == osOK)
+		if (msg == 1)
 			break;
 		MX_BlueNRG_MS_Process();
 		HAL_Delay(25);
 	}
+	msg--;
 	MX_Connect_Peripheral();
 	while (1) {
-		osStatus_t ret = osSemaphoreAcquire(semaphore, 0);
-		if (ret == osOK)
+		if (msg == 1)
 			break;
 		MX_BlueNRG_MS_Process();
 		HAL_Delay(25);
 	}
+	msg--;
+	uint8_t uuid[16];
+	COPY_ACC_GYRO_MAG_W2ST_CHAR_UUID(uuid);
+	MX_Discover_Characteristic(UUID_TYPE_128, uuid);
+	while (1) {
+		if (msg == 1)
+			break;
+		MX_BlueNRG_MS_Process();
+		HAL_Delay(25);
+	}
+	msg--;
+	AcceleratoHandle = DiscoveredHandle;
+	COPY_SAMPLE_FREQUENCY_CHAR_UUID(uuid);
+	MX_Discover_Characteristic(UUID_TYPE_128, uuid);
+	while (1) {
+		if (msg == 1)
+			break;
+		MX_BlueNRG_MS_Process();
+		HAL_Delay(25);
+	}
+	msg--;
+	FrequencyHandle = DiscoveredHandle;
+	MX_Enable_Notification(AcceleratoHandle);
+	// while (1) {
+	// 	if (msg == 1)
+	// 		break;
+	// 	MX_BlueNRG_MS_Process();
+	// 	HAL_Delay(25);
+	// }
 }
 
 /* USER CODE END 4 */
