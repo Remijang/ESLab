@@ -43,9 +43,9 @@
 #include "stm32l475e_iot01_accelero.h"
 #include "stm32l4xx_hal_tim.h"
 
-/* USER CODE BEGIN Includes */
+/* Private function prototypes -----------------------------------------------*/
 
-/* USER CODE END Includes */
+static void User_Init(void);
 
 /* Private defines -----------------------------------------------------------*/
 /**
@@ -91,13 +91,6 @@ static volatile uint8_t user_button_pressed = 0;
 extern uint8_t msg;
 
 /* Private function prototypes -----------------------------------------------*/
-static void User_Process(void);
-static void User_Init(void);
-
-/* USER CODE BEGIN PFP */
-
-/* USER CODE END PFP */
-
 #if PRINT_CSV_FORMAT
 extern volatile uint32_t ms_counter;
 /**
@@ -114,32 +107,6 @@ void print_csv_time(void) {
 	);
 }
 #endif
-
-// /**
-//  * @brief  Update acceleration characteristic value
-//  * @param  AxesRaw_t structure containing acceleration value in mg.
-//  * @retval tBleStatus Status
-//  */
-// tBleStatus Acc_Update(AxesRaw_t *x_axes) {
-// 	uint8_t buff[2 + 2 * 3];
-// 	tBleStatus ret;
-
-// 	HOST_TO_LE_16(buff, (HAL_GetTick() >> 3));
-
-// 	HOST_TO_LE_16(buff + 2, (uint16_t)x_axes->AXIS_X);
-// 	HOST_TO_LE_16(buff + 4, (uint16_t)x_axes->AXIS_Y);
-// 	HOST_TO_LE_16(buff + 6, (uint16_t)x_axes->AXIS_Z);
-
-// 	ret = aci_gatt_update_char_value_ext_IDB05A1(
-// 		HWServW2STHandle, AccGyroMagCharHandle, NOTIFICATION, 8, 0, 2 + 2 * 3, buff
-// 	);
-// 	if (ret != BLE_STATUS_SUCCESS) {
-// 		PRINTF("Error while updating Acceleration characteristic: 0x%02X\r\n", ret);
-// 		return BLE_STATUS_ERROR;
-// 	}
-
-// 	return BLE_STATUS_SUCCESS;
-// }
 
 void MX_BlueNRG_MS_Init(void) {
 	/* Initialize the peripherals and the BLE Stack */
@@ -213,6 +180,10 @@ void MX_BlueNRG_MS_Init(void) {
 	PRINTF("BLE Stack Initialized\r\n");
 	/* Set output power level */
 	ret = aci_hal_set_tx_power_level(1, 4);
+}
+
+static void User_Init(void) {
+	BSP_COM_Init(COM1);
 }
 
 void MX_Start_Scanning(void) {
@@ -293,7 +264,7 @@ void MX_Enable_Notification(uint16_t char_handle) {
 	while (1) {
 		if (msg == 1)
 			break;
-		MX_BlueNRG_MS_Process();
+		hci_user_evt_proc();
 		HAL_Delay(25);
 	}
 	msg--;
@@ -312,7 +283,7 @@ void MX_Enable_Notification(uint16_t char_handle) {
 	while (1) {
 		if (msg == 1)
 			break;
-		MX_BlueNRG_MS_Process();
+		hci_user_evt_proc();
 		HAL_Delay(25);
 	}
 	msg--;
@@ -321,70 +292,22 @@ void MX_Enable_Notification(uint16_t char_handle) {
 /*
  * BlueNRG-MS background task
  */
-void MX_BlueNRG_MS_Process(void) {
+void MX_Process_Event(void) {
 	hci_user_evt_proc();
 }
 
-/**
- * @brief  Initialize User process.
- *
- * @param  None
- * @retval None
- */
-static void User_Init(void) {
-	BSP_PB_Init(BUTTON_KEY, BUTTON_MODE_EXTI);
-	BSP_LED_Init(LED2);
-	BSP_COM_Init(COM1);
-}
-
-/**
- * @brief  Process user input (i.e. pressing the USER button on Nucleo board)
- *         and send the updated acceleration data to the remote client.
- *
- * @param  None
- * @retval None
- */
-static void User_Process(void) {
-	if (set_connectable) {
-		Set_DeviceConnectable();
-		set_connectable = FALSE;
+void MX_Write_Data(uint16_t char_handle, uint8_t *data, uint8_t length) {
+	tBleStatus ret =
+		aci_gatt_write_charac_value(connection_handle, char_handle, length, data);
+	if (ret != BLE_STATUS_SUCCESS)
+		PRINTF("Failed to update frequency\n");
+	else
+		PRINTF("--- Start Updating Frequency ---\n");
+	while (1) {
+		if (msg == 1)
+			break;
+		hci_user_evt_proc();
+		HAL_Delay(25);
 	}
-
-#if USE_BUTTON
-	/* Check if the user has pushed the button */
-	if (user_button_pressed) {
-		/* Debouncing */
-		HAL_Delay(50);
-
-		/* Wait until the User Button is released */
-		while (BSP_PB_GetState(BUTTON_KEY) == !user_button_init_state)
-			;
-
-		/* Debouncing */
-		HAL_Delay(50);
-#endif
-		BSP_LED_Toggle(LED2);
-
-// 		if (connected) {
-// 			Acc_Update(&x_axes);
-
-// #if !USE_BUTTON
-// 			HAL_Delay(100); /* wait 1 sec before sending new data */
-// #endif
-// 		}
-#if USE_BUTTON
-		/* Reset the User Button flag */
-		user_button_pressed = 0;
-	}
-#endif
-}
-
-/**
- * @brief  BSP Push Button callback
- * @param  Button Specifies the pin connected EXTI line
- * @retval None.
- */
-void BSP_PB_Callback(Button_TypeDef Button) {
-	/* Set the User Button flag */
-	user_button_pressed = 1;
+	msg--;
 }

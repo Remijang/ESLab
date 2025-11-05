@@ -46,9 +46,7 @@ __IO uint16_t connection_handle = 0;
 __IO uint8_t notification_enabled = FALSE;
 __IO uint32_t connected = FALSE;
 
-extern uint16_t EnvironmentalCharHandle;
-extern uint16_t AccGyroMagCharHandle;
-extern uint16_t DiscoveredHandle;
+extern uint16_t DiscoveredHandle, AcceleratoHandle, FrequencyHandle;
 extern uint8_t msg;
 extern const char complete_name[];
 extern uint8_t dev_bdaddr[BDADDR_SIZE];
@@ -74,7 +72,7 @@ void GATT_Procedure_Complete_CB(evt_gatt_procedure_complete *data);
 void GATT_Discover_Read_Char_By_UUID_CB(evt_gatt_disc_read_char_by_uuid_resp *data);
 void ATT_Find_Info_CB(evt_att_find_information_resp *data);
 bool Is_Identical_UUID(UUID_t uuid1, UUID_t uuid2, uint8_t type, bool reverse);
-
+void Notification_Handler(evt_gatt_attr_notification *data);
 /* Private functions ---------------------------------------------------------*/
 
 /*******************************************************************************
@@ -356,9 +354,11 @@ bool Is_Identical_UUID(UUID_t uuid1, UUID_t uuid2, uint8_t type, bool reverse) {
 }
 
 void Notification_Handler(evt_gatt_attr_notification *data) {
-	PRINTF("    Get Notification: ");
-	for (int i = 0; i < data->event_data_length - 2; i++) {
-		PRINTF("%02X", data->attr_value[i]);
-	}
-	PRINTF("\r\n");
+	if (data->attr_handle != AcceleratoHandle)
+		return;
+	PRINTF("    Get Accelerato Notification: ");
+	PRINTF(
+		"%d %d %d\n", *(int16_t *)(data->attr_value + 2),
+		*(int16_t *)(data->attr_value + 4), *(int16_t *)(data->attr_value + 6)
+	);
 }

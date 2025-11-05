@@ -54,11 +54,12 @@ extern "C" {
 
 /* Exported Functions --------------------------------------------------------*/
 void MX_BlueNRG_MS_Init(void);
-void MX_BlueNRG_MS_Process(void);
+void MX_Process_Event(void);
 void MX_Start_Scanning(void);
 void MX_Stop_Scanning(void);
 void MX_Connect_Peripheral(void);
 void MX_Discover_Characteristic(uint8_t uuid_type, const uint8_t *uuid);
+void MX_Enable_Notification(uint16_t char_handle);
 
 #define X_OFFSET 200
 #define Y_OFFSET 50

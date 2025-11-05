@@ -78,7 +78,6 @@ uint8_t msg = 0;
 const osSemaphoreAttr_t binarySem_attributes = {.name = "BinarySem"};
 osMutexId_t mutex;
 const osMutexAttr_t mutex_attributes = {.name = "Mutex"};
-uint16_t freq;
 
 extern AxesRaw_t x_axes;
 int16_t pDataXYZ[3];
@@ -98,7 +97,8 @@ static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_TIM16_Init(void);
 void ACC_InitGPIO(void);
 void Task_ACC_Func(void *argument);
-void Scan(void *argument);
+void Task_Freq_Func(void *argument);
+void Scan(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -146,11 +146,13 @@ int main(void) {
 	ACC_InitGPIO();
 
 	// /* USER CODE BEGIN 2 */
-	// freq = 100;
+	PRINTF("Debug 1\r\n");
+
 	osKernelInitialize();
+	Scan();
 	semaphore = osSemaphoreNew(1U, 0U, &binarySem_attributes);
 	// mutex = osMutexNew(&mutex_attributes);
-	tid1 = osThreadNew(Scan, NULL, &task1_attributes);
+	tid1 = osThreadNew(Task_Freq_Func, NULL, &task1_attributes);
 	// tid2 = osThreadNew(Task_ACC_Func, NULL, &task2_attributes);
 	osKernelStart();
 	// Scan();
@@ -641,17 +643,19 @@ void Task_ACC_Func(void *argument) {
 		// x_axes.AXIS_Y = pDataXYZ[1];
 		// x_axes.AXIS_Z = pDataXYZ[2];
 		osThreadYield();
-		MX_BlueNRG_MS_Process();
+		MX_Process_Event();
 		osDelay(osKernelGetTickCount() / 10);
 		// PRINTF("%ld %ld %ld\n", x_axes.AXIS_X, x_axes.AXIS_Y, x_axes.AXIS_Z);
 	}
 }
-void Scan(void *argument) {
+
+void Task_Freq_Func(void *argument) {}
+void Scan(void) {
 	MX_Start_Scanning();
 	while (1) {
 		if (msg == 1)
 			break;
-		MX_BlueNRG_MS_Process();
+		MX_Process_Event();
 		HAL_Delay(25);
 	}
 	msg--;
@@ -659,7 +663,7 @@ void Scan(void *argument) {
 	while (1) {
 		if (msg == 1)
 			break;
-		MX_BlueNRG_MS_Process();
+		MX_Process_Event();
 		HAL_Delay(25);
 	}
 	msg--;
@@ -667,7 +671,7 @@ void Scan(void *argument) {
 	while (1) {
 		if (msg == 1)
 			break;
-		MX_BlueNRG_MS_Process();
+		MX_Process_Event();
 		HAL_Delay(25);
 	}
 	msg--;
@@ -677,7 +681,7 @@ void Scan(void *argument) {
 	while (1) {
 		if (msg == 1)
 			break;
-		MX_BlueNRG_MS_Process();
+		MX_Process_Event();
 		HAL_Delay(25);
 	}
 	msg--;
@@ -687,16 +691,19 @@ void Scan(void *argument) {
 	while (1) {
 		if (msg == 1)
 			break;
-		MX_BlueNRG_MS_Process();
+		MX_Process_Event();
 		HAL_Delay(25);
 	}
 	msg--;
 	FrequencyHandle = DiscoveredHandle;
 	MX_Enable_Notification(AcceleratoHandle);
 	while (1) {
-		MX_BlueNRG_MS_Process();
+		if (msg == 1)
+			break;
+		MX_Process_Event();
 		HAL_Delay(25);
 	}
+	msg--;
 }
 
 /* USER CODE END 4 */
