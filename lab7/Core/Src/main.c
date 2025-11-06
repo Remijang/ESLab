@@ -140,6 +140,11 @@ int main(void)
   if ( status != ARM_MATH_SUCCESS)
 	  while (1);
 
+  for (i = 0; i < TEST_LENGTH_SAMPLES; ++i)
+	  printf("%.2f %.2f \n", testOutput[i], refOutput[i]);
+
+  printf("snr: \n%.2f\n", snr);
+
   while (1);
 }
 
