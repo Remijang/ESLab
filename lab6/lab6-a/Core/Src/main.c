@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "stdio.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -76,7 +76,11 @@ static void MX_USART1_UART_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 /* USER CODE BEGIN PFP */
-
+int __io_putchar(int ch)
+{
+	HAL_UART_Transmit(&huart1, (uint8_t *) &ch, 1, 0xffff);
+	return ch;
+}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -122,7 +126,7 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
   /* USER CODE BEGIN 2 */
-  HAL_DFSDM_FilterRegularStart_DMA(&hdma_dfsdm1_flt0, RecBuf, AUDIO_REC)
+  HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter0, RecBuf, AUDIO_REC);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -135,14 +139,22 @@ int main(void)
 	  if (DmaRecHalfBuffCplt == 1)
 	  {
 		  for (i = 0; i < AUDIO_REC / 2; ++i)
-			  PlayBuf[i] = RecBuff[i] >> 8;
+			  PlayBuf[i] = RecBuf[i] >> 8;
 		  DmaRecHalfBuffCplt = 0;
+		  printf("1: %ld\n", RecBuf[0]);
+		  HAL_GPIO_TogglePin(ARD_D13_GPIO_Port, ARD_D13_Pin);
+		  HAL_Delay(10);
+		  HAL_GPIO_TogglePin(ARD_D13_GPIO_Port, ARD_D13_Pin);
 	  }
 	  if (DmaRecBuffCplt == 1)
 	  {
 		  for (i = AUDIO_REC / 2; i < AUDIO_REC; ++i)
-			  PlayBuf[i] = RecBuff[i] >> 8;
+			  PlayBuf[i] = RecBuf[i] >> 8;
 		  DmaRecBuffCplt = 0;
+		  printf("2: %ld\n", RecBuf[AUDIO_REC / 2]);
+		  HAL_GPIO_TogglePin(ARD_D7_GPIO_Port, ARD_D7_Pin);
+		  HAL_Delay(10);
+		  HAL_GPIO_TogglePin(ARD_D7_GPIO_Port, ARD_D7_Pin);
 	  }
   }
   /* USER CODE END 3 */
@@ -599,17 +611,25 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : ARD_D7_Pin */
   GPIO_InitStruct.Pin = ARD_D7_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG_ADC_CONTROL;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(ARD_D7_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : ARD_D13_Pin ARD_D12_Pin ARD_D11_Pin */
-  GPIO_InitStruct.Pin = ARD_D13_Pin|ARD_D12_Pin|ARD_D11_Pin;
+  /*Configure GPIO pins : ARD_D12_Pin ARD_D11_Pin */
+  GPIO_InitStruct.Pin = ARD_D12_Pin|ARD_D11_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   GPIO_InitStruct.Alternate = GPIO_AF5_SPI1;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : ARD_D13_Pin */
+  GPIO_InitStruct.Pin = ARD_D13_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(ARD_D13_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : ARD_D3_Pin */
   GPIO_InitStruct.Pin = ARD_D3_Pin;
