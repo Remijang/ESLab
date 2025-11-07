@@ -18,10 +18,12 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stdio.h"
+#include "stdlib.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -42,42 +44,54 @@
 /* Private variables ---------------------------------------------------------*/
 UART_HandleTypeDef huart1;
 
+/* Definitions for task1 */
+osThreadId_t task1Handle;
+const osThreadAttr_t task1_attributes = {
+  .name = "task1",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for task2 */
+osThreadId_t task2Handle;
+const osThreadAttr_t task2_attributes = {
+  .name = "task2",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
 /* USER CODE BEGIN PV */
-
+int d = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
+void task1_func(void *argument);
+void task2_func(void *argument);
+
 /* USER CODE BEGIN PFP */
 int __io_putchar (int ch)
 {
-	HAL_UART_Transmit (&huart1, (uint8_t *) &ch, 1, 0xFFFF);
+	HAL_UART_Transmit (&huart1, (uint8_t *) &ch, 1, 0xFFFFFFFF);
 	return ch;
 }
 
 int __io_getchar (void)
 {
 	uint8_t ch;
-	HAL_StatusTypeDef status = HAL_UART_Receive (&huart1, &ch, 1, HAL_MAX_DELAY);
+	HAL_StatusTypeDef status;
+	
+	do {
+		status = HAL_UART_Receive (&huart1, &ch, 1, 0);
+		if (status == HAL_TIMEOUT) {
+			osDelay(1);
+		}
+	} while (status == HAL_TIMEOUT);
+	
 	if (status != HAL_OK) {
-		return -1;  // Return error on failure
+		return -1;
 	}
 	return (int)ch;
-}
-int _read(int file, char *ptr, int len)
-{
-	(void)file;
-	int ret, ch;
-	for (ret = 0; ret < len;) {
-		ch = __io_getchar();
-		if (ch == -1) break;
-		*ptr++ = (char)ch;
-		ret++;
-		if (ch == '\n' || ch == '\r') break;
-	}
-	return ret;
 }
 /* USER CODE END PFP */
 
@@ -120,15 +134,53 @@ int main(void)
 
   /* USER CODE END 2 */
 
+  /* Init scheduler */
+  osKernelInitialize();
+  /* Create the mutex(es) */
+  /* creation of mutex */
+
+  /* USER CODE BEGIN RTOS_MUTEX */
+  /* add mutexes, ... */
+  /* USER CODE END RTOS_MUTEX */
+
+  /* USER CODE BEGIN RTOS_SEMAPHORES */
+  /* add semaphores, ... */
+  /* USER CODE END RTOS_SEMAPHORES */
+
+  /* USER CODE BEGIN RTOS_TIMERS */
+  /* start timers, add new ones, ... */
+  /* USER CODE END RTOS_TIMERS */
+
+  /* USER CODE BEGIN RTOS_QUEUES */
+  /* add queues, ... */
+  /* USER CODE END RTOS_QUEUES */
+
+  /* Create the thread(s) */
+  /* creation of task1 */
+  task1Handle = osThreadNew(task1_func, NULL, &task1_attributes);
+
+  /* creation of task2 */
+  task2Handle = osThreadNew(task2_func, NULL, &task2_attributes);
+
+  /* USER CODE BEGIN RTOS_THREADS */
+  /* add threads, ... */
+  /* USER CODE END RTOS_THREADS */
+
+  /* USER CODE BEGIN RTOS_EVENTS */
+  /* add events, ... */
+  /* USER CODE END RTOS_EVENTS */
+
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
     /* USER CODE END WHILE */
-	int d = 0;
-	printf("Enter a number: ");
-	scanf("%d", &d);
-	printf("Got number: %d\n", d);
+
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -457,10 +509,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
@@ -471,6 +523,77 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 
 /* USER CODE END 4 */
+
+/* USER CODE BEGIN Header_task1_func */
+/**
+  * @brief  Function implementing the task1 thread.
+  * @param  argument: Not used
+  * @retval None
+  */
+/* USER CODE END Header_task1_func */
+void task1_func(void *argument)
+{
+  /* USER CODE BEGIN 5 */
+  char buffer[32];
+  int idx = 0;
+  int ch;
+
+  /* Infinite loop */
+  for(;;)
+  {
+	printf("Enter a number: ");
+	fflush(stdout);
+	idx = 0;
+	buffer[0] = '\0';
+
+	while (idx < (sizeof(buffer) - 1)) {
+		ch = __io_getchar();
+		if (ch == -1) {
+			osDelay(1);
+			continue;
+		}
+		if (ch == '\n' || ch == '\r') {
+			buffer[idx] = '\0';
+			break;
+		} else if (ch >= '0' && ch <= '9') {
+			buffer[idx++] = (char)ch;
+		} else if (ch == '-' && idx == 0) {
+			buffer[idx++] = (char)ch;
+		}
+	}
+
+	if (idx > 0) {
+		d = atoi(buffer);
+		printf("Got number: %d\n", d);
+	} else {
+		printf("Invalid input\n");
+	}
+	fflush(stdout);
+
+    osDelay(1000);
+  }
+  /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_task2_func */
+/**
+* @brief Function implementing the task2 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_task2_func */
+void task2_func(void *argument)
+{
+  /* USER CODE BEGIN task2_func */
+  /* Infinite loop */
+  for(;;)
+  {
+	printf("Current number: %d\n", d);
+	fflush(stdout);
+    osDelay(1000);
+  }
+  /* USER CODE END task2_func */
+}
 
 /**
   * @brief  This function is executed in case of error occurrence.
