@@ -78,13 +78,12 @@ const osThreadAttr_t task3_attributes = {
 	.stack_size = 256 * 4,
 	.priority = (osPriority_t)osPriorityNormal,
 };
+osSemaphoreId_t sem0;
+const osSemaphoreAttr_t binarySem_attributes0 = {.name = "Sem0"};
 osSemaphoreId_t sem1;
 const osSemaphoreAttr_t binarySem_attributes1 = {.name = "Sem1"};
 osSemaphoreId_t sem2;
 const osSemaphoreAttr_t binarySem_attributes2 = {.name = "Sem2"};
-osMutexId_t mutex;
-const osMutexAttr_t mutex_attributes = {.name = "Mutex"};
-uint16_t freq;
 osTimerId_t timer;
 const osTimerAttr_t timer_attributes = {.name = "Timer"};
 
@@ -92,6 +91,7 @@ const osTimerAttr_t timer_attributes = {.name = "Timer"};
 // UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
+uint16_t freq;
 extern AxesRaw_t x_axes;
 int16_t pDataXYZ[3];
 
@@ -113,6 +113,8 @@ uint32_t blockSize = BLOCK_SIZE;
 arm_fir_instance_f32 S;
 arm_status status;
 float32_t  *inputF32, *outputF32;
+
+#define timerDelay 100U
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -128,6 +130,7 @@ void ACC_InitGPIO(void);
 void Task_ACC_Func(void *argument);
 void Task_DSP_Func(void *argument);
 void Task_BLE_Func(void *argument);
+void Timer_Callback(void *argument);
 /* USER CODE BEGIN PFP */
 /* USER CODE END PFP */
 
@@ -182,12 +185,15 @@ int main(void) {
 	arm_fir_init_f32(&S, NUM_TAPS, (float32_t *)&firCoeffs32[0], &firStateF32[0], blockSize);
 
 	osKernelInitialize();
+	sem0 = osSemaphoreNew(1U, 0U, &binarySem_attributes0);
 	sem1 = osSemaphoreNew(1U, 0U, &binarySem_attributes1);
 	sem2 = osSemaphoreNew(1U, 0U, &binarySem_attributes2);
-	mutex = osMutexNew(&mutex_attributes);
+	timer = osTimerNew(Timer_Callback, osTimerPeriodic, NULL, &timer_attributes);
 	tid1 = osThreadNew(Task_ACC_Func, NULL, &task1_attributes);
 	tid2 = osThreadNew(Task_DSP_Func, NULL, &task2_attributes);
 	tid3 = osThreadNew(Task_BLE_Func, NULL, &task3_attributes);
+
+	osTimerStart(timer, timerDelay);
 	osKernelStart();
 
 	/* USER CODE END 2 */
@@ -665,7 +671,7 @@ void ACC_InitGPIO(void) {
 void Task_ACC_Func(void *argument) {
 	int count = 0;
 	for (;;) {
-		if (count)
+		osSemaphoreAcquire(sem0, osWaitForever);
 		BSP_ACCELERO_AccGetXYZ(pDataXYZ);
 		input[count] = pDataXYZ[0];
 		// x_axes.AXIS_Y = pDataXYZ[1];
@@ -698,6 +704,10 @@ void Task_BLE_Func(void *argument) {
 		printf("\n");
 		MX_BlueNRG_MS_Process();
 	}
+}
+
+void Timer_Callback(void *argument) {
+	osSemaphoreRelease(sem0);
 }
 /* USER CODE END 4 */
 
