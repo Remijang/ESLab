@@ -1,21 +1,21 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.h
-  * @brief          : Header for main.c file.
-  *                   This file contains the common defines of the application.
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2025 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.h
+ * @brief          : Header for main.c file.
+ *                   This file contains the common defines of the application.
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2025 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
@@ -27,8 +27,13 @@ extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
+#include "FreeRTOSConfig.h"
+#include "b_l475e_iot01a1.h"
+#include "gatt_db.h"
+#include "hci_tl_interface.h"
+#include "stm32l475e_iot01_accelero.h"
+#include "stm32l475xx.h"
 #include "stm32l4xx_hal.h"
-
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -69,9 +74,7 @@ void Error_Handler(void);
 #define SPBTLE_RF_IRQ_EXTI6_Pin GPIO_PIN_6
 #define SPBTLE_RF_IRQ_EXTI6_GPIO_Port GPIOE
 #define SPBTLE_RF_IRQ_EXTI6_EXTI_IRQn EXTI9_5_IRQn
-#define BUTTON_EXTI13_Pin GPIO_PIN_13
-#define BUTTON_EXTI13_GPIO_Port GPIOC
-#define BUTTON_EXTI13_EXTI_IRQn EXTI15_10_IRQn
+#define BSP_BUTTON_EXTI_IRQn EXTI15_10_IRQn
 #define ARD_A5_Pin GPIO_PIN_0
 #define ARD_A5_GPIO_Port GPIOC
 #define ARD_A4_Pin GPIO_PIN_1
@@ -132,8 +135,6 @@ void Error_Handler(void);
 #define ISM43362_BOOT0_GPIO_Port GPIOB
 #define ISM43362_WAKEUP_Pin GPIO_PIN_13
 #define ISM43362_WAKEUP_GPIO_Port GPIOB
-#define LED2_Pin GPIO_PIN_14
-#define LED2_GPIO_Port GPIOB
 #define SPSGRF_915_SDN_Pin GPIO_PIN_15
 #define SPSGRF_915_SDN_GPIO_Port GPIOB
 #define INTERNAL_UART3_TX_Pin GPIO_PIN_8
