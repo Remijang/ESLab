@@ -213,11 +213,15 @@ tBleStatus Acc_Update(AxesRaw_t *x_axes) {
 	HOST_TO_LE_16(buff, (HAL_GetTick() >> 3));
 
 	for (int i = 0; i < 32; ++i) {
-		HOST_TO_LE_16(buff + 2 * (i + 1), (uint16_t)x_axes->AXIS_X[i]);
+		HOST_TO_LE_16(buff + 2 * (i + 1), (uint16_t)x_axes->before[i]);
+	}
+
+	for (int i = 0; i < 32; ++i) {
+		HOST_TO_LE_16(buff + 64 + 2 * (i + 1), (uint16_t)x_axes->after[i]);
 	}
 
 	ret = aci_gatt_update_char_value_ext_IDB05A1(
-		HWServW2STHandle, AccGyroMagCharHandle, NOTIFICATION, 8, 0, 2 + 2 * 32, buff
+		HWServW2STHandle, AccGyroMagCharHandle, NOTIFICATION, 8, 0, 2 + 2 * 64, buff
 	);
 	if (ret != BLE_STATUS_SUCCESS) {
 		PRINTF("Error while updating Acceleration characteristic: 0x%02X\n", ret);

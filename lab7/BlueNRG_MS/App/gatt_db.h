@@ -43,7 +43,8 @@
  * @brief Structure containing acceleration value of each axis.
  */
 typedef struct {
-	int32_t AXIS_X[32];
+	int32_t before[32];
+	int32_t after[32];
 } AxesRaw_t;
 
 enum { ACCELERATION_SERVICE_INDEX = 0, ENVIRONMENTAL_SERVICE_INDEX = 1 };

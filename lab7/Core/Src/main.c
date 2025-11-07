@@ -691,8 +691,9 @@ void Task_BLE_Func(void *argument) {
 	for (;;) {
 		osSemaphoreAcquire(sem2, osWaitForever);
 		for (int i = 0; i < blockSize; ++i) {
-			x_axes.AXIS_X[i] = (int) output[i];
-			printf("%.2f ", output[i]);
+			x_axes.before[i] = (int) input[i];
+			x_axes.after[i] = (int) output[i];
+			printf("(%.2f, %.2f) ", input[i], output[i]);
 		}
 		printf("\n");
 		MX_BlueNRG_MS_Process();
