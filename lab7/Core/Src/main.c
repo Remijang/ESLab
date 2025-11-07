@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -46,6 +47,42 @@
 /* Private variables ---------------------------------------------------------*/
 UART_HandleTypeDef huart1;
 
+/* Definitions for task1 */
+osThreadId_t task1Handle;
+const osThreadAttr_t task1_attributes = {
+  .name = "task1",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
+};
+/* Definitions for task2 */
+osThreadId_t task2Handle;
+const osThreadAttr_t task2_attributes = {
+  .name = "task2",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for task3 */
+osThreadId_t task3Handle;
+const osThreadAttr_t task3_attributes = {
+  .name = "task3",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for timer */
+osTimerId_t timerHandle;
+const osTimerAttr_t timer_attributes = {
+  .name = "timer"
+};
+/* Definitions for sem1to2 */
+osSemaphoreId_t sem1to2Handle;
+const osSemaphoreAttr_t sem1to2_attributes = {
+  .name = "sem1to2"
+};
+/* Definitions for sem2to3 */
+osSemaphoreId_t sem2to3Handle;
+const osSemaphoreAttr_t sem2to3_attributes = {
+  .name = "sem2to3"
+};
 /* USER CODE BEGIN PV */
 extern float32_t testInput_f32_1kHz_15kHz[TEST_LENGTH_SAMPLES];
 extern float32_t refOutput[TEST_LENGTH_SAMPLES];
@@ -64,13 +101,18 @@ const float32_t firCoeffs32[NUM_TAPS] = {
 uint32_t blockSize = BLOCK_SIZE;
 uint32_t numBlocks = TEST_LENGTH_SAMPLES/BLOCK_SIZE;
 
-float32_t  snr;
+arm_fir_instance_f32 S;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
+void task1_func(void *argument);
+void task2_func(void *argument);
+void task3_func(void *argument);
+void timer_callback(void *argument);
+
 /* USER CODE BEGIN PFP */
 int __io_putchar(int ch)
 {
@@ -115,37 +157,71 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  uint32_t i;
-  arm_fir_instance_f32 S;
-  arm_status status;
-  float32_t  *inputF32, *outputF32;
 
-  inputF32 = &testInput_f32_1kHz_15kHz[0];
-  outputF32 = &testOutput[0];
+  /* USER CODE END 2 */
 
-  arm_fir_init_f32(&S, NUM_TAPS, (float32_t *)&firCoeffs32[0], &firStateF32[0], blockSize);
+  /* Init scheduler */
+  osKernelInitialize();
 
-  for(i=0; i < numBlocks; i++)
+  /* USER CODE BEGIN RTOS_MUTEX */
+  /* add mutexes, ... */
+  /* USER CODE END RTOS_MUTEX */
+
+  /* Create the semaphores(s) */
+  /* creation of sem1to2 */
+  sem1to2Handle = osSemaphoreNew(1, 0, &sem1to2_attributes);
+
+  /* creation of sem2to3 */
+  sem2to3Handle = osSemaphoreNew(1, 0, &sem2to3_attributes);
+
+  /* USER CODE BEGIN RTOS_SEMAPHORES */
+  /* add semaphores, ... */
+  /* USER CODE END RTOS_SEMAPHORES */
+
+  /* Create the timer(s) */
+  /* creation of timer */
+  timerHandle = osTimerNew(timer_callback, osTimerPeriodic, NULL, &timer_attributes);
+
+  /* USER CODE BEGIN RTOS_TIMERS */
+  /* start timers, add new ones, ... */
+  /* USER CODE END RTOS_TIMERS */
+
+  /* USER CODE BEGIN RTOS_QUEUES */
+  /* add queues, ... */
+  /* USER CODE END RTOS_QUEUES */
+
+  /* Create the thread(s) */
+  /* creation of task1 */
+  task1Handle = osThreadNew(task1_func, NULL, &task1_attributes);
+
+  /* creation of task2 */
+  task2Handle = osThreadNew(task2_func, NULL, &task2_attributes);
+
+  /* creation of task3 */
+  task3Handle = osThreadNew(task3_func, NULL, &task3_attributes);
+
+  /* USER CODE BEGIN RTOS_THREADS */
+  /* add threads, ... */
+  /* USER CODE END RTOS_THREADS */
+
+  /* USER CODE BEGIN RTOS_EVENTS */
+  /* add events, ... */
+  /* USER CODE END RTOS_EVENTS */
+
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
+
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+  while (1)
   {
-	  arm_fir_f32(&S, inputF32 + (i * blockSize), outputF32 + (i * blockSize), blockSize);
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
   }
-
-  snr = arm_snr_f32(&refOutput[0], &testOutput[0], TEST_LENGTH_SAMPLES);
-
-  if (snr < SNR_THRESHOLD_F32)
-	  status = ARM_MATH_TEST_FAILURE;
-  else
-	  status = ARM_MATH_SUCCESS;
-
-  if ( status != ARM_MATH_SUCCESS)
-	  while (1);
-
-  for (i = 0; i < TEST_LENGTH_SAMPLES; ++i)
-	  printf("%.2f %.2f \n", testOutput[i], refOutput[i]);
-
-  printf("snr: \n%.2f\n", snr);
-
-  while (1);
+  /* USER CODE END 3 */
 }
 
 /**
@@ -471,10 +547,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
@@ -485,6 +561,68 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 
 /* USER CODE END 4 */
+
+/* USER CODE BEGIN Header_task1_func */
+/**
+  * @brief  Function implementing the task1 thread.
+  * @param  argument: Not used
+  * @retval None
+  */
+/* USER CODE END Header_task1_func */
+void task1_func(void *argument)
+{
+  /* USER CODE BEGIN 5 */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_task2_func */
+/**
+* @brief Function implementing the task2 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_task2_func */
+void task2_func(void *argument)
+{
+  /* USER CODE BEGIN task2_func */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END task2_func */
+}
+
+/* USER CODE BEGIN Header_task3_func */
+/**
+* @brief Function implementing the task3 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_task3_func */
+void task3_func(void *argument)
+{
+  /* USER CODE BEGIN task3_func */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END task3_func */
+}
+
+/* timer_callback function */
+void timer_callback(void *argument)
+{
+  /* USER CODE BEGIN timer_callback */
+
+  /* USER CODE END timer_callback */
+}
 
 /**
   * @brief  This function is executed in case of error occurrence.
