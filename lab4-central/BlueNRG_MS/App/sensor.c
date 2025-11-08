@@ -114,7 +114,7 @@ void Set_DeviceConnectable(void) {
 
 	hci_le_set_scan_resp_data(0, NULL);
 
-	PRINTF("Set General Discoverable Mode.\r\n");
+	THREAD_PRINTF("Set General Discoverable Mode.\n");
 
 	ret = aci_gap_set_discoverable(
 		ADV_DATA_TYPE, (ADV_INTERVAL_MIN_MS * 1000) / 625,
@@ -125,18 +125,18 @@ void Set_DeviceConnectable(void) {
 	aci_gap_update_adv_data(26, manuf_data);
 
 	if (ret != BLE_STATUS_SUCCESS) {
-		PRINTF("aci_gap_set_discoverable() failed: 0x%02X\r\n", ret);
+		THREAD_PRINTF("aci_gap_set_discoverable() failed: 0x%02X\n", ret);
 	} else
-		PRINTF("aci_gap_set_discoverable() --> SUCCESS\r\n");
+		THREAD_PRINTF("aci_gap_set_discoverable() --> SUCCESS\n");
 }
 
 void dump_packet(hci_event_pckt *event_pckt) {
 	for (uint8_t i = 0; i < event_pckt->plen; i++) {
-		PRINTF("%02X", event_pckt->data[i]);
+		THREAD_PRINTF("%02X", event_pckt->data[i]);
 		if ((i + 1) % 16 == 0)
-			PRINTF("\r\n");
+			THREAD_PRINTF("\n");
 	}
-	PRINTF("\r\n");
+	THREAD_PRINTF("\n");
 }
 /**
  * @brief  Callback processing the ACI events.
@@ -206,7 +206,7 @@ void user_notify(void *pData) {
  */
 void GAP_DisconnectionComplete_CB(void) {
 	connected = FALSE;
-	PRINTF("Disconnected\r\n");
+	THREAD_PRINTF("Disconnected\n");
 	/* Make the device connectable again. */
 	set_connectable = TRUE;
 	notification_enabled = FALSE;
@@ -222,12 +222,12 @@ void GAP_ConnectionComplete_CB(uint8_t addr[6], uint16_t handle) {
 	connected = TRUE;
 	connection_handle = handle;
 
-	PRINTF("Connected to device:");
+	THREAD_PRINTF("Connected to device:");
 	for (uint32_t i = 5; i > 0; i--) {
-		PRINTF("%02X-", addr[i]);
+		THREAD_PRINTF("%02X-", addr[i]);
 	}
-	PRINTF("%02X\r\n", addr[0]);
-	PRINTF("\r\n---  Connect Complete  ---\r\n");
+	THREAD_PRINTF("%02X\n", addr[0]);
+	THREAD_PRINTF("\n---  Connect Complete  ---\n");
 	msg++;
 }
 
@@ -240,29 +240,30 @@ void GAP_Device_Found_CB(uint8_t *data) {
 	if (ret == 1 && strncmp(buf, complete_name, strlen(complete_name)) == 0) {
 		for (int i = 0; i < 6; i++)
 			dev_bdaddr[i] = le_info->bdaddr[i];
-		PRINTF(
-			"Found device %02X:%02X:%02X:%02X:%02X:%02X, complete name: %s\r\n",
+		THREAD_PRINTF(
+			"Found device %02X:%02X:%02X:%02X:%02X:%02X, complete name: %s\n",
 			dev_bdaddr[0], dev_bdaddr[1], dev_bdaddr[2], dev_bdaddr[3], dev_bdaddr[4],
 			dev_bdaddr[5], buf
 		);
-		msg++;
+		if (msg == 0)
+			msg++;
 	}
 }
 
 void GAP_Procedure_Complete_CB(evt_gap_procedure_complete *data) {
 	switch (data->procedure_code) {
 		case GAP_GENERAL_DISCOVERY_PROC:
-			PRINTF("---  End of Scan  ---\r\n\r\n");
+			THREAD_PRINTF("---  End of Scan  ---\n\n");
 			msg++;
 			break;
 		default:
-			PRINTF("---  Procedure Complete: %d  ---\r\n\r\n", data->procedure_code);
+			THREAD_PRINTF("---  Procedure Complete: %d  ---\n\n", data->procedure_code);
 			return;
 	}
 }
 
 void GATT_Procedure_Complete_CB(evt_gatt_procedure_complete *data) {
-	PRINTF("---  GATT Procedure Complete  ---\r\n");
+	THREAD_PRINTF("---  GATT Procedure Complete  ---\n");
 	msg++;
 }
 
@@ -270,7 +271,7 @@ uint8_t parse_advertising_data(
 	uint8_t *data, uint8_t data_length, char *buf, uint8_t buf_len
 ) {
 	if (data == 0) {
-		PRINTF("No complete name found.\r\n");
+		THREAD_PRINTF("No complete name found.\n");
 		return 0;
 	}
 	uint8_t index = 0;
@@ -287,31 +288,31 @@ uint8_t parse_advertising_data(
 				name_len = buf_len - 1;
 			memcpy(buf, &data[index + 2], name_len);
 			buf[name_len] = '\0';
-			PRINTF("Device name: %s\r\n", buf);
+			THREAD_PRINTF("Device name: %s\n", buf);
 			return 1;
 		}
 
 		index += field_length + 1;	// Move to next AD structure
 	}
-	PRINTF("No complete name found.\r\n");
+	THREAD_PRINTF("No complete name found.\n");
 	return 0;
 }
 
 void GATT_Discover_Read_Char_By_UUID_CB(evt_gatt_disc_read_char_by_uuid_resp *data) {
 	DiscoveredHandle = data->attr_handle;
-	PRINTF("    Found Handle 0x%04X\r\n", DiscoveredHandle);
+	THREAD_PRINTF("    Found Handle 0x%04X\n", DiscoveredHandle);
 }
 
 void ATT_Find_Info_CB(evt_att_find_information_resp *data) {
-	PRINTF("    Info format: %d\r\n", data->format);
-	PRINTF(
-		"    Info handle: %02X%02X\r\n    Info UUID: ", data->handle_uuid_pair[0],
+	THREAD_PRINTF("    Info format: %d\n", data->format);
+	THREAD_PRINTF(
+		"    Info handle: %02X%02X\n    Info UUID: ", data->handle_uuid_pair[0],
 		data->handle_uuid_pair[1]
 	);
 	for (int i = 0; i < 16; i++) {
-		PRINTF("%02X", data->handle_uuid_pair[2 + i]);
+		THREAD_PRINTF("%02X", data->handle_uuid_pair[2 + i]);
 	}
-	PRINTF("\r\n");
+	THREAD_PRINTF("\n");
 
 	UUID_t uuid;
 	if (target_type == UUID_TYPE_128) {
@@ -354,11 +355,11 @@ bool Is_Identical_UUID(UUID_t uuid1, UUID_t uuid2, uint8_t type, bool reverse) {
 }
 
 void Notification_Handler(evt_gatt_attr_notification *data) {
-	if (data->attr_handle != AcceleratoHandle)
+	if (data->attr_handle != AcceleratoHandle + 1)
 		return;
-	PRINTF("    Get Accelerato Notification: ");
-	PRINTF(
-		"%d %d %d\n", *(int16_t *)(data->attr_value + 2),
-		*(int16_t *)(data->attr_value + 4), *(int16_t *)(data->attr_value + 6)
+	THREAD_PRINTF("    Get Accelerato Notification: ");
+	THREAD_PRINTF(
+		"%c%c %c%c %c%c\n", data->attr_value[2], data->attr_value[3], data->attr_value[4],
+		data->attr_value[5], data->attr_value[6], data->attr_value[7]
 	);
 }

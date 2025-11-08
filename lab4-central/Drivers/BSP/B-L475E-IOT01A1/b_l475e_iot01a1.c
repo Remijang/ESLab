@@ -72,7 +72,7 @@ EXTI_HandleTypeDef hpb_exti[BUTTONn] = {{.Line = EXTI_LINE_13}};
 USART_TypeDef *COM_USART[COMn] = {COM1_UART};
 UART_HandleTypeDef hcom_uart[COMn];
 #if (USE_COM_LOG > 0)
-static COM_TypeDef COM_ActiveLogPort;
+COM_TypeDef COM_ActiveLogPort;
 #endif
 #if (USE_HAL_UART_REGISTER_CALLBACKS == 1U)
 static uint32_t IsUsart1MspCbValid = 0;
@@ -97,21 +97,17 @@ static void I2Cx_MspInit(I2C_HandleTypeDef *i2c_handler);
 static void I2Cx_MspDeInit(I2C_HandleTypeDef *i2c_handler);
 static void I2Cx_Init(I2C_HandleTypeDef *i2c_handler);
 static void I2Cx_DeInit(I2C_HandleTypeDef *i2c_handler);
-static HAL_StatusTypeDef I2Cx_ReadMultiple(I2C_HandleTypeDef *i2c_handler,
-										   uint8_t Addr,
-										   uint16_t Reg,
-										   uint16_t MemAddSize,
-										   uint8_t *Buffer,
-										   uint16_t Length);
-static HAL_StatusTypeDef I2Cx_WriteMultiple(I2C_HandleTypeDef *i2c_handler,
-											uint8_t Addr,
-											uint16_t Reg,
-											uint16_t MemAddSize,
-											uint8_t *Buffer,
-											uint16_t Length);
-static HAL_StatusTypeDef I2Cx_IsDeviceReady(I2C_HandleTypeDef *i2c_handler,
-											uint16_t DevAddress,
-											uint32_t Trials);
+static HAL_StatusTypeDef I2Cx_ReadMultiple(
+	I2C_HandleTypeDef *i2c_handler, uint8_t Addr, uint16_t Reg, uint16_t MemAddSize,
+	uint8_t *Buffer, uint16_t Length
+);
+static HAL_StatusTypeDef I2Cx_WriteMultiple(
+	I2C_HandleTypeDef *i2c_handler, uint8_t Addr, uint16_t Reg, uint16_t MemAddSize,
+	uint8_t *Buffer, uint16_t Length
+);
+static HAL_StatusTypeDef I2Cx_IsDeviceReady(
+	I2C_HandleTypeDef *i2c_handler, uint16_t DevAddress, uint32_t Trials
+);
 static void I2Cx_Error(I2C_HandleTypeDef *i2c_handler, uint8_t Addr);
 
 /* Sensors IO functions */
@@ -119,10 +115,9 @@ void SENSOR_IO_Init(void);
 void SENSOR_IO_DeInit(void);
 void SENSOR_IO_Write(uint8_t Addr, uint8_t Reg, uint8_t Value);
 uint8_t SENSOR_IO_Read(uint8_t Addr, uint8_t Reg);
-uint16_t SENSOR_IO_ReadMultiple(uint8_t Addr,
-								uint8_t Reg,
-								uint8_t *Buffer,
-								uint16_t Length);
+uint16_t SENSOR_IO_ReadMultiple(
+	uint8_t Addr, uint8_t Reg, uint8_t *Buffer, uint16_t Length
+);
 void SENSOR_IO_WriteMultiple(uint8_t Addr, uint8_t Reg, uint8_t *Buffer, uint16_t Length);
 HAL_StatusTypeDef SENSOR_IO_IsDeviceReady(uint16_t DevAddress, uint32_t Trials);
 void SENSOR_IO_Delay(uint32_t Delay);
@@ -272,7 +267,8 @@ int32_t BSP_PB_Init(Button_TypeDef Button, ButtonMode_TypeDef ButtonMode) {
 	int32_t ret = BSP_ERROR_NONE;
 
 	static const BSP_EXTI_LineCallback ButtonCallback[BUTTONn] = {
-		BUTTON_USER_EXTI_Callback};
+		BUTTON_USER_EXTI_Callback
+	};
 	static const uint32_t BSP_BUTTON_PRIO[BUTTONn] = {BSP_BUTTON_USER_IT_PRIORITY};
 	static const uint32_t BUTTON_EXTI_LINE[BUTTONn] = {USER_BUTTON_EXTI_LINE};
 	static const BSP_BUTTON_GPIO_Init ButtonGpioInit[BUTTONn] = {BUTTON_USER_GPIO_Init};
@@ -282,9 +278,9 @@ int32_t BSP_PB_Init(Button_TypeDef Button, ButtonMode_TypeDef ButtonMode) {
 	if (ButtonMode == BUTTON_MODE_EXTI) {
 		if (HAL_EXTI_GetHandle(&hpb_exti[Button], BUTTON_EXTI_LINE[Button]) != HAL_OK) {
 			ret = BSP_ERROR_PERIPH_FAILURE;
-		} else if (HAL_EXTI_RegisterCallback(&hpb_exti[Button],
-											 HAL_EXTI_COMMON_CB_ID,
-											 ButtonCallback[Button]) != HAL_OK) {
+		} else if (HAL_EXTI_RegisterCallback(
+					   &hpb_exti[Button], HAL_EXTI_COMMON_CB_ID, ButtonCallback[Button]
+				   ) != HAL_OK) {
 			ret = BSP_ERROR_PERIPH_FAILURE;
 		} else {
 			/* Enable and set Button EXTI Interrupt to the lowest priority */
@@ -483,11 +479,12 @@ int32_t BSP_COM_RegisterDefaultMspCallbacks(COM_TypeDef COM) {
 
 		/* Register default MspInit/MspDeInit Callback */
 		if (HAL_UART_RegisterCallback(
-				&hcom_uart[COM], HAL_UART_MSPINIT_CB_ID, USART1_MspInit) != HAL_OK) {
+				&hcom_uart[COM], HAL_UART_MSPINIT_CB_ID, USART1_MspInit
+			) != HAL_OK) {
 			ret = BSP_ERROR_PERIPH_FAILURE;
-		} else if (HAL_UART_RegisterCallback(&hcom_uart[COM],
-											 HAL_UART_MSPDEINIT_CB_ID,
-											 USART1_MspDeInit) != HAL_OK) {
+		} else if (HAL_UART_RegisterCallback(
+					   &hcom_uart[COM], HAL_UART_MSPDEINIT_CB_ID, USART1_MspDeInit
+				   ) != HAL_OK) {
 			ret = BSP_ERROR_PERIPH_FAILURE;
 		} else {
 			IsUsart1MspCbValid = 1U;
@@ -512,13 +509,13 @@ int32_t BSP_COM_RegisterMspCallbacks(COM_TypeDef COM, BSP_COM_Cb_t *Callback) {
 		__HAL_UART_RESET_HANDLE_STATE(&hcom_uart[COM]);
 
 		/* Register MspInit/MspDeInit Callbacks */
-		if (HAL_UART_RegisterCallback(&hcom_uart[COM],
-									  HAL_UART_MSPINIT_CB_ID,
-									  Callback->pMspInitCb) != HAL_OK) {
+		if (HAL_UART_RegisterCallback(
+				&hcom_uart[COM], HAL_UART_MSPINIT_CB_ID, Callback->pMspInitCb
+			) != HAL_OK) {
 			ret = BSP_ERROR_PERIPH_FAILURE;
-		} else if (HAL_UART_RegisterCallback(&hcom_uart[COM],
-											 HAL_UART_MSPDEINIT_CB_ID,
-											 Callback->pMspDeInitCb) != HAL_OK) {
+		} else if (HAL_UART_RegisterCallback(
+					   &hcom_uart[COM], HAL_UART_MSPDEINIT_CB_ID, Callback->pMspDeInitCb
+				   ) != HAL_OK) {
 			ret = BSP_ERROR_PERIPH_FAILURE;
 		} else {
 			IsUsart1MspCbValid = 1U;
@@ -569,7 +566,8 @@ size_t __write(int Handle, const unsigned char *Buf, size_t Bufsize) {
 
 	for (i = 0; i < Bufsize; i++) {
 		(void)HAL_UART_Transmit(
-			&hcom_uart[COM_ActiveLogPort], (uint8_t *)&Buf[i], 1, COM_POLL_TIMEOUT);
+			&hcom_uart[COM_ActiveLogPort], (uint8_t *)&Buf[i], 1, COM_POLL_TIMEOUT
+		);
 	}
 
 	return Bufsize;
@@ -579,17 +577,21 @@ size_t __write(int Handle, const unsigned char *Buf, size_t Bufsize) {
 		 (__ARMCC_VERSION >= 6010050)) /* For ARM Compiler 5 and 6 */
 int fputc(int ch, FILE *f) {
 	(void)HAL_UART_Transmit(
-		&hcom_uart[COM_ActiveLogPort], (uint8_t *)&ch, 1, COM_POLL_TIMEOUT);
+		&hcom_uart[COM_ActiveLogPort], (uint8_t *)&ch, 1, COM_POLL_TIMEOUT
+	);
 	return ch;
 }
 	#else							   /* For GCC Toolchains */
+
 int __io_putchar(int ch) {
 	(void)HAL_UART_Transmit(
-		&hcom_uart[COM_ActiveLogPort], (uint8_t *)&ch, 1, COM_POLL_TIMEOUT);
+		&hcom_uart[COM_ActiveLogPort], (uint8_t *)&ch, 1, COM_POLL_TIMEOUT
+	);
 	return ch;
 }
-	#endif							   /* For IAR */
-#endif								   /* USE_COM_LOG */
+
+	#endif /* For IAR */
+#endif	   /* USE_COM_LOG */
 /**
  * @brief  Initializes USART1 MSP.
  * @param  huart USART1 handle
@@ -764,16 +766,15 @@ static void I2Cx_DeInit(I2C_HandleTypeDef *i2c_handler) { /* DeInit the I2C */
  * @param  Length  Length of the data
  * @retval HAL status
  */
-static HAL_StatusTypeDef I2Cx_ReadMultiple(I2C_HandleTypeDef *i2c_handler,
-										   uint8_t Addr,
-										   uint16_t Reg,
-										   uint16_t MemAddress,
-										   uint8_t *Buffer,
-										   uint16_t Length) {
+static HAL_StatusTypeDef I2Cx_ReadMultiple(
+	I2C_HandleTypeDef *i2c_handler, uint8_t Addr, uint16_t Reg, uint16_t MemAddress,
+	uint8_t *Buffer, uint16_t Length
+) {
 	HAL_StatusTypeDef status = HAL_OK;
 
 	status = HAL_I2C_Mem_Read(
-		i2c_handler, Addr, (uint16_t)Reg, MemAddress, Buffer, Length, 1000);
+		i2c_handler, Addr, (uint16_t)Reg, MemAddress, Buffer, Length, 1000
+	);
 
 	/* Check the communication status */
 	if (status != HAL_OK) {
@@ -793,16 +794,15 @@ static HAL_StatusTypeDef I2Cx_ReadMultiple(I2C_HandleTypeDef *i2c_handler,
  * @param  Length  buffer size to be written
  * @retval HAL status
  */
-static HAL_StatusTypeDef I2Cx_WriteMultiple(I2C_HandleTypeDef *i2c_handler,
-											uint8_t Addr,
-											uint16_t Reg,
-											uint16_t MemAddress,
-											uint8_t *Buffer,
-											uint16_t Length) {
+static HAL_StatusTypeDef I2Cx_WriteMultiple(
+	I2C_HandleTypeDef *i2c_handler, uint8_t Addr, uint16_t Reg, uint16_t MemAddress,
+	uint8_t *Buffer, uint16_t Length
+) {
 	HAL_StatusTypeDef status = HAL_OK;
 
 	status = HAL_I2C_Mem_Write(
-		i2c_handler, Addr, (uint16_t)Reg, MemAddress, Buffer, Length, 1000);
+		i2c_handler, Addr, (uint16_t)Reg, MemAddress, Buffer, Length, 1000
+	);
 
 	/* Check the communication status */
 	if (status != HAL_OK) {
@@ -820,9 +820,9 @@ static HAL_StatusTypeDef I2Cx_WriteMultiple(I2C_HandleTypeDef *i2c_handler,
  * @param  Trials  Number of trials
  * @retval HAL status
  */
-static HAL_StatusTypeDef I2Cx_IsDeviceReady(I2C_HandleTypeDef *i2c_handler,
-											uint16_t DevAddress,
-											uint32_t Trials) {
+static HAL_StatusTypeDef I2Cx_IsDeviceReady(
+	I2C_HandleTypeDef *i2c_handler, uint16_t DevAddress, uint32_t Trials
+) {
 	return (HAL_I2C_IsDeviceReady(i2c_handler, DevAddress, Trials, 1000));
 }
 
@@ -874,7 +874,8 @@ void SENSOR_IO_DeInit(void) {
  */
 void SENSOR_IO_Write(uint8_t Addr, uint8_t Reg, uint8_t Value) {
 	I2Cx_WriteMultiple(
-		&hI2cHandler, Addr, (uint16_t)Reg, I2C_MEMADD_SIZE_8BIT, (uint8_t *)&Value, 1);
+		&hI2cHandler, Addr, (uint16_t)Reg, I2C_MEMADD_SIZE_8BIT, (uint8_t *)&Value, 1
+	);
 }
 
 /**
@@ -887,7 +888,8 @@ uint8_t SENSOR_IO_Read(uint8_t Addr, uint8_t Reg) {
 	uint8_t read_value = 0;
 
 	I2Cx_ReadMultiple(
-		&hI2cHandler, Addr, Reg, I2C_MEMADD_SIZE_8BIT, (uint8_t *)&read_value, 1);
+		&hI2cHandler, Addr, Reg, I2C_MEMADD_SIZE_8BIT, (uint8_t *)&read_value, 1
+	);
 
 	return read_value;
 }
@@ -901,12 +903,12 @@ uint8_t SENSOR_IO_Read(uint8_t Addr, uint8_t Reg) {
  * @param  Length  Length of the data
  * @retval HAL status
  */
-uint16_t SENSOR_IO_ReadMultiple(uint8_t Addr,
-								uint8_t Reg,
-								uint8_t *Buffer,
-								uint16_t Length) {
+uint16_t SENSOR_IO_ReadMultiple(
+	uint8_t Addr, uint8_t Reg, uint8_t *Buffer, uint16_t Length
+) {
 	return I2Cx_ReadMultiple(
-		&hI2cHandler, Addr, (uint16_t)Reg, I2C_MEMADD_SIZE_8BIT, Buffer, Length);
+		&hI2cHandler, Addr, (uint16_t)Reg, I2C_MEMADD_SIZE_8BIT, Buffer, Length
+	);
 }
 
 /**
@@ -918,12 +920,12 @@ uint16_t SENSOR_IO_ReadMultiple(uint8_t Addr,
  * @param  Length  Length of the data
  * @retval None
  */
-void SENSOR_IO_WriteMultiple(uint8_t Addr,
-							 uint8_t Reg,
-							 uint8_t *Buffer,
-							 uint16_t Length) {
+void SENSOR_IO_WriteMultiple(
+	uint8_t Addr, uint8_t Reg, uint8_t *Buffer, uint16_t Length
+) {
 	I2Cx_WriteMultiple(
-		&hI2cHandler, Addr, (uint16_t)Reg, I2C_MEMADD_SIZE_8BIT, Buffer, Length);
+		&hI2cHandler, Addr, (uint16_t)Reg, I2C_MEMADD_SIZE_8BIT, Buffer, Length
+	);
 }
 
 /**

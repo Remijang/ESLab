@@ -108,6 +108,32 @@ void print_csv_time(void) {
 }
 #endif
 
+// /**
+//  * @brief  Update acceleration characteristic value
+//  * @param  AxesRaw_t structure containing acceleration value in mg.
+//  * @retval tBleStatus Status
+//  */
+// tBleStatus Acc_Update(AxesRaw_t *x_axes) {
+// 	uint8_t buff[2 + 2 * 3];
+// 	tBleStatus ret;
+
+// 	HOST_TO_LE_16(buff, (HAL_GetTick() >> 3));
+
+// 	HOST_TO_LE_16(buff + 2, (uint16_t)x_axes->AXIS_X);
+// 	HOST_TO_LE_16(buff + 4, (uint16_t)x_axes->AXIS_Y);
+// 	HOST_TO_LE_16(buff + 6, (uint16_t)x_axes->AXIS_Z);
+
+// 	ret = aci_gatt_update_char_value_ext_IDB05A1(
+// 		HWServW2STHandle, AccGyroMagCharHandle, NOTIFICATION, 8, 0, 2 + 2 * 3, buff
+// 	);
+// 	if (ret != BLE_STATUS_SUCCESS) {
+// 		THREAD_PRINTF("Error while updating Acceleration characteristic: 0x%02X\n", ret);
+// 		return BLE_STATUS_ERROR;
+// 	}
+
+// 	return BLE_STATUS_SUCCESS;
+// }
+
 void MX_BlueNRG_MS_Init(void) {
 	/* Initialize the peripherals and the BLE Stack */
 	const char *name = "Central";
@@ -130,7 +156,7 @@ void MX_BlueNRG_MS_Init(void) {
 	 */
 	hci_reset();
 	HAL_Delay(100);
-	PRINTF("HWver %d\r\nFWver %d\r\n", hwVersion, fwVersion);
+	THREAD_PRINTF("HWver %d\nFWver %d\n", hwVersion, fwVersion);
 	if (hwVersion > 0x30) { /* X-NUCLEO-IDB05A1 expansion board is used */
 		bnrg_expansion_board = IDB05A1;
 	}
@@ -138,20 +164,20 @@ void MX_BlueNRG_MS_Init(void) {
 		CONFIG_DATA_RANDOM_ADDRESS, BDADDR_SIZE, &bdaddr_len_out, bdaddr
 	);
 	if (ret) {
-		PRINTF("Read Static Random address failed.\r\n");
+		THREAD_PRINTF("Read Static Random address failed.\n");
 	}
 	if ((bdaddr[5] & 0xC0) != 0xC0) {
-		PRINTF("Static Random address not well formed.\r\n");
+		THREAD_PRINTF("Static Random address not well formed.\n");
 		while (1) {}
 	}
-	PRINTF(
-		"Device address: %02X:%02X:%02X:%02X:%02X:%02X\r\n", bdaddr[0], bdaddr[1],
+	THREAD_PRINTF(
+		"Device address: %02X:%02X:%02X:%02X:%02X:%02X\n", bdaddr[0], bdaddr[1],
 		bdaddr[2], bdaddr[3], bdaddr[4], bdaddr[5]
 	);
 	/* GATT Init */
 	ret = aci_gatt_init();
 	if (ret) {
-		PRINTF("GATT_Init failed.\r\n");
+		THREAD_PRINTF("GATT_Init failed.\n");
 	}
 
 	/* GAP Init */
@@ -167,17 +193,17 @@ void MX_BlueNRG_MS_Init(void) {
 		);
 	}
 	if (ret != BLE_STATUS_SUCCESS) {
-		PRINTF("GAP_Init failed.\r\n");
+		THREAD_PRINTF("GAP_Init failed.\n");
 	}
 	/* Update device name */
 	ret = aci_gatt_update_char_value(
 		service_handle, dev_name_char_handle, 0, strlen(name), (uint8_t *)name
 	);
 	if (ret) {
-		PRINTF("aci_gatt_update_char_value failed.\r\n");
+		THREAD_PRINTF("aci_gatt_update_char_value failed.\n");
 		while (1) {}
 	}
-	PRINTF("BLE Stack Initialized\r\n");
+	THREAD_PRINTF("BLE Stack Initialized\n");
 	/* Set output power level */
 	ret = aci_hal_set_tx_power_level(1, 4);
 }
@@ -192,18 +218,21 @@ void MX_Start_Scanning(void) {
 		scanInterval, scanInterval, STATIC_RANDOM_ADDR, 0x01
 	);
 	if (ret != BLE_STATUS_SUCCESS) {
-		PRINTF("Error occurs\r\n");
+		THREAD_PRINTF("Error occurs\n");
 	} else {
-		PRINTF("--- Start of Scan ---\r\n");
+		THREAD_PRINTF("--- Start of Scan ---\n");
 	}
 }
 
 void MX_Stop_Scanning(void) {
-	tBleStatus ret = aci_gap_terminate_gap_procedure(GAP_GENERAL_DISCOVERY_PROC);
+	tBleStatus ret;
+	do {
+		ret = aci_gap_terminate_gap_procedure(GAP_GENERAL_DISCOVERY_PROC);
+	} while (ret == BLE_STATUS_TIMEOUT);
 	if (ret != BLE_STATUS_SUCCESS) {
-		PRINTF("Failed to stop scanning, error: 0x%02X\r\n", ret);
+		THREAD_PRINTF("Failed to stop scanning, error: 0x%02X\n", ret);
 	} else {
-		PRINTF("--- Stop Scanning ---\r\n");
+		THREAD_PRINTF("--- Stop Scanning ---\n");
 	}
 }
 
@@ -222,7 +251,7 @@ void MX_Connect_Peripheral(void) {
 	uint16_t min_conn_length = 0x0000;
 	uint16_t max_conn_length = 0xFFFF;
 
-	PRINTF("\r\n--  Start Connecting to peripheral  ---\r\n");
+	THREAD_PRINTF("\n--  Start Connecting to peripheral  ---\n");
 
 	ret = aci_gap_create_connection(
 		scanInterval, scanWindow, peer_bdaddr_type, dev_bdaddr, own_bdaddr_type,
@@ -231,23 +260,23 @@ void MX_Connect_Peripheral(void) {
 	);
 
 	if (ret == BLE_STATUS_SUCCESS) {
-		PRINTF("aci_gap_create_connection: OK\r\n");
+		THREAD_PRINTF("aci_gap_create_connection: OK\n");
 	} else {
-		PRINTF("aci_gap_create_connection failed (0x%02X)\r\n", ret);
+		THREAD_PRINTF("aci_gap_create_connection failed (0x%02X)\n", ret);
 	}
 }
 
 void MX_Discover_Characteristic(uint8_t uuid_type, const uint8_t *uuid) {
 	tBleStatus ret =
 		aci_gatt_disc_charac_by_uuid(connection_handle, 0x0001, 0xffff, uuid_type, uuid);
-	if (ret != BLE_STATUS_SUCCESS)
-		PRINTF("Failed to start characteristic discovery by UUID: 0x%02X\r\n", ret);
-	else {
-		PRINTF("---  Start Discovering characteristic: ");
+	if (ret != BLE_STATUS_SUCCESS) {
+		THREAD_PRINTF("Failed to start characteristic discovery by UUID: 0x%02X\n", ret);
+	} else {
+		THREAD_PRINTF("---  Start Discovering characteristic: ");
 		for (int i = 0; i < 16; i++) {
-			PRINTF("%02X", uuid[i]);
+			THREAD_PRINTF("%02X", uuid[i]);
 		}
-		PRINTF("  ---\r\n");
+		THREAD_PRINTF("  ---\n");
 	}
 }
 
@@ -257,10 +286,11 @@ void MX_Enable_Notification(uint16_t char_handle) {
 	DiscoveredHandle = 0x0000;
 	tBleStatus ret =
 		aci_gatt_disc_all_charac_descriptors(connection_handle, char_handle, 0xFFFF);
-	if (ret != BLE_STATUS_SUCCESS)
-		PRINTF("Failed to find notification handle: 0x%02X\r\n", ret);
-	else
-		PRINTF("---  Finding Notification Handle ---\r\n");
+	if (ret != BLE_STATUS_SUCCESS) {
+		THREAD_PRINTF("Failed to find notification handle: 0x%02X\n", ret);
+	} else {
+		THREAD_PRINTF("---  Finding Notification Handle ---\n");
+	}
 	while (1) {
 		if (msg == 1)
 			break;
@@ -269,17 +299,18 @@ void MX_Enable_Notification(uint16_t char_handle) {
 	}
 	msg--;
 	if (DiscoveredHandle == 0x0000) {
-		PRINTF("    Notification Handle Not Found\r\n");
+		THREAD_PRINTF("    Notification Handle Not Found\n");
 		exit(1);
 		return;
 	}
-	PRINTF("    Find notification handle: %04X\r\n", DiscoveredHandle);
+	THREAD_PRINTF("    Find notification handle: %04X\n", DiscoveredHandle);
 	uint8_t data[2] = {0x01, 0x00};
-	ret = aci_gatt_write_charac_value(connection_handle, DiscoveredHandle, 2, data);
-	if (ret != BLE_STATUS_SUCCESS)
-		PRINTF("Failed to enable notification: 0x%02X\r\n", ret);
-	else
-		PRINTF("--- Start Writing 0x0100 to Notification Handle ---\r\n");
+	ret = aci_gatt_write_charac_descriptor(connection_handle, DiscoveredHandle, 2, data);
+	if (ret != BLE_STATUS_SUCCESS) {
+		THREAD_PRINTF("Failed to enable notification: 0x%02X\n", ret);
+	} else {
+		THREAD_PRINTF("--- Start Writing 0x0100 to Notification Handle ---\n");
+	}
 	while (1) {
 		if (msg == 1)
 			break;
@@ -299,10 +330,12 @@ void MX_Process_Event(void) {
 void MX_Write_Data(uint16_t char_handle, uint8_t *data, uint8_t length) {
 	tBleStatus ret =
 		aci_gatt_write_charac_value(connection_handle, char_handle, length, data);
-	if (ret != BLE_STATUS_SUCCESS)
-		PRINTF("Failed to update frequency\n");
-	else
-		PRINTF("--- Start Updating Frequency ---\n");
+	if (ret != BLE_STATUS_SUCCESS) {
+		THREAD_PRINTF("Error writing data: %02X\n", ret);
+		return;
+	} else {
+		THREAD_PRINTF("Start writing data\n");
+	}
 	while (1) {
 		if (msg == 1)
 			break;
@@ -310,4 +343,5 @@ void MX_Write_Data(uint16_t char_handle, uint8_t *data, uint8_t length) {
 		HAL_Delay(25);
 	}
 	msg--;
+	return;
 }

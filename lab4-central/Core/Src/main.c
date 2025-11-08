@@ -19,12 +19,14 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
+#include "FreeRTOS.h"
 #include "app_bluenrg_ms.h"
 #include "bluenrg_gap.h"
 #include "bluenrg_gap_aci.h"
 #include "bluenrg_gatt_server.h"
 #include "cmsis_os2.h"
 #include "hci_tl_interface.h"
+#include "queue.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -43,8 +45,22 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
+#include <stdarg.h>
 #include <stdio.h>
+
+osThreadId_t tid1, tid2, tid_scan;
+osMutexId_t print_mutex, scanf_mutex;
+uint8_t read_flag = 1;
+extern COM_TypeDef COM_ActiveLogPort;
+extern uint8_t rxByte;
+#include "b_l475e_iot01a1.h"
 #define PRINTF(...) printf(__VA_ARGS__)
+#define THREAD_PRINTF(...)                                    \
+	if (osMutexAcquire(print_mutex, osWaitForever) == osOK) { \
+		PRINTF(__VA_ARGS__);                                  \
+		osMutexRelease(print_mutex);                          \
+	}
+
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -60,28 +76,35 @@ UART_HandleTypeDef huart3;
 
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
-osThreadId_t tid1;
-const osThreadAttr_t task1_attributes = {
+const osThreadAttr_t task_scan_attributes = {
 	.name = "Task_Scan",
 	.stack_size = 256 * 4,
-	.priority = (osPriority_t)osPriorityNormal,
+	.priority = (osPriority_t)osPriorityHigh,
 };
-/* Definitions for Task2 */
-osThreadId_t tid2;
+const osThreadAttr_t task1_attributes = {
+	.name = "Task_Freq",
+	.stack_size = 256 * 4,
+	.priority = (osPriority_t)osPriorityAboveNormal,
+};
 const osThreadAttr_t task2_attributes = {
 	.name = "Task_ACC",
-	.stack_size = 128 * 4,
-	.priority = (osPriority_t)osPriorityNormal,
+	.stack_size = 256 * 4,
+	.priority = (osPriority_t)osPriorityAboveNormal,
 };
 osSemaphoreId_t semaphore;
 uint8_t msg = 0;
 const osSemaphoreAttr_t binarySem_attributes = {.name = "BinarySem"};
-osMutexId_t mutex;
+
 const osMutexAttr_t mutex_attributes = {.name = "Mutex"};
+
+osEventFlagsId_t bleDoneFlags;
 
 extern AxesRaw_t x_axes;
 int16_t pDataXYZ[3];
 uint16_t AcceleratoHandle, FrequencyHandle, DiscoveredHandle;
+
+extern QueueHandle_t uartRxQueue;
+extern uint8_t rxByte;	// temp buffer for HAL_RX_IT
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -98,7 +121,7 @@ static void MX_TIM16_Init(void);
 void ACC_InitGPIO(void);
 void Task_ACC_Func(void *argument);
 void Task_Freq_Func(void *argument);
-void Scan(void);
+void Task_Scan_Func(void *argument);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -145,15 +168,16 @@ int main(void) {
 	BSP_ACCELERO_Init();
 	ACC_InitGPIO();
 
+	setvbuf(stdin, NULL, _IONBF, 0);
+	setvbuf(stdout, NULL, _IONBF, 0);
 	// /* USER CODE BEGIN 2 */
-	PRINTF("Debug 1\r\n");
-
 	osKernelInitialize();
-	Scan();
 	semaphore = osSemaphoreNew(1U, 0U, &binarySem_attributes);
-	// mutex = osMutexNew(&mutex_attributes);
+	print_mutex = osMutexNew(NULL);
+	scanf_mutex = osMutexNew(NULL);
 	tid1 = osThreadNew(Task_Freq_Func, NULL, &task1_attributes);
-	// tid2 = osThreadNew(Task_ACC_Func, NULL, &task2_attributes);
+	tid2 = osThreadNew(Task_ACC_Func, NULL, &task2_attributes);
+	tid_scan = osThreadNew(Task_Scan_Func, NULL, &task_scan_attributes);
 	osKernelStart();
 	// Scan();
 	/* USER CODE END 2 */
@@ -638,19 +662,23 @@ void ACC_InitGPIO(void) {
 
 void Task_ACC_Func(void *argument) {
 	for (;;) {
-		// BSP_ACCELERO_AccGetXYZ(pDataXYZ);
-		// x_axes.AXIS_X = pDataXYZ[0];
-		// x_axes.AXIS_Y = pDataXYZ[1];
-		// x_axes.AXIS_Z = pDataXYZ[2];
-		osThreadYield();
 		MX_Process_Event();
-		osDelay(osKernelGetTickCount() / 10);
-		// PRINTF("%ld %ld %ld\n", x_axes.AXIS_X, x_axes.AXIS_Y, x_axes.AXIS_Z);
+		HAL_Delay(25);
+		osThreadYield();
 	}
 }
 
-void Task_Freq_Func(void *argument) {}
-void Scan(void) {
+void Task_Freq_Func(void *argument) {
+	for (uint16_t freq = 5; freq <= 20; freq += 5) {
+		uint8_t data[2];
+		data[0] = freq / 10 + '0';
+		data[1] = (freq % 10) + '0';
+		MX_Write_Data(FrequencyHandle + 1, data, 2);
+		THREAD_PRINTF("Frequency Updated: %d\n", freq);
+		osDelay(osKernelGetTickFreq() * 10);
+	}
+}
+void Task_Scan_Func(void *argument) {
 	MX_Start_Scanning();
 	while (1) {
 		if (msg == 1)
@@ -697,13 +725,7 @@ void Scan(void) {
 	msg--;
 	FrequencyHandle = DiscoveredHandle;
 	MX_Enable_Notification(AcceleratoHandle);
-	while (1) {
-		if (msg == 1)
-			break;
-		MX_Process_Event();
-		HAL_Delay(25);
-	}
-	msg--;
+	osThreadExit();
 }
 
 /* USER CODE END 4 */
@@ -730,7 +752,7 @@ void Error_Handler(void) {
 void assert_failed(uint8_t *file, uint32_t line) {
 	/* USER CODE BEGIN 6 */
 	/* User can add his own implementation to report the file name and line number,
-	   ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+	   ex: printf("Wrong parameters value: file %s on line %d\n", file, line) */
 	/* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */

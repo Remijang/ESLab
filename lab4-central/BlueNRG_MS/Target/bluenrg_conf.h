@@ -71,7 +71,7 @@ extern "C" {
 
 #if (BLE1_DEBUG == 1)
 #include <stdio.h>
-#define PRINTF(...)                   printf(__VA_ARGS__)
+// #define PRINTF(...)                   printf(__VA_ARGS__)
 #else
 #define PRINTF(...)
 #endif

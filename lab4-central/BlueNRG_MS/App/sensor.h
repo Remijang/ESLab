@@ -95,5 +95,12 @@ typedef union UUID_t_s {
 } UUID_t;
 
 extern uint8_t Application_Max_Attribute_Records[];
-
+#include "cmsis_os2.h"
+extern osMutexId_t print_mutex;
+#define PRINTF(...) printf(__VA_ARGS__)
+#define THREAD_PRINTF(...)                                    \
+	if (osMutexAcquire(print_mutex, osWaitForever) == osOK) { \
+		PRINTF(__VA_ARGS__);                                  \
+		osMutexRelease(print_mutex);                          \
+	}
 #endif /* SENSOR_H */

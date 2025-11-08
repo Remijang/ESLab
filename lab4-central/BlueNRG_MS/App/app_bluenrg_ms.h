@@ -60,6 +60,7 @@ void MX_Stop_Scanning(void);
 void MX_Connect_Peripheral(void);
 void MX_Discover_Characteristic(uint8_t uuid_type, const uint8_t *uuid);
 void MX_Enable_Notification(uint16_t char_handle);
+void MX_Write_Data(uint16_t char_handle, uint8_t *data, uint8_t length);
 
 #define X_OFFSET 200
 #define Y_OFFSET 50
@@ -79,6 +80,14 @@ void MX_Enable_Notification(uint16_t char_handle);
 enum { ACCELERATION_SERVICE_INDEX = 0, ENVIRONMENTAL_SERVICE_INDEX = 1 };
 
 extern uint8_t Services_Max_Attribute_Records[];
+#include "cmsis_os2.h"
+extern osMutexId_t print_mutex;
+#define PRINTF(...) printf(__VA_ARGS__)
+#define THREAD_PRINTF(...)                                    \
+	if (osMutexAcquire(print_mutex, osWaitForever) == osOK) { \
+		PRINTF(__VA_ARGS__);                                  \
+		osMutexRelease(print_mutex);                          \
+	}
 #ifdef __cplusplus
 }
 #endif
