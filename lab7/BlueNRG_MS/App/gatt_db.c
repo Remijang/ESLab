@@ -143,7 +143,7 @@ tBleStatus Add_HWServW2ST_Service(void) {
 	COPY_ACC_GYRO_MAG_W2ST_CHAR_UUID(uuid);
 	BLUENRG_memcpy(&char_uuid.Char_UUID_128, uuid, 16);
 	ret = aci_gatt_add_char(
-		HWServW2STHandle, UUID_TYPE_128, char_uuid.Char_UUID_128, 2 + 3 * 2,
+		HWServW2STHandle, UUID_TYPE_128, char_uuid.Char_UUID_128, 2 + 32 * 4,
 		CHAR_PROP_NOTIFY | CHAR_PROP_READ, ATTR_PERMISSION_NONE,
 		GATT_NOTIFY_READ_REQ_AND_WAIT_FOR_APPL_RESP, 16, 0, &AccGyroMagCharHandle
 	);
@@ -207,21 +207,17 @@ fail:
  * @retval tBleStatus Status
  */
 tBleStatus Acc_Update(AxesRaw_t *x_axes) {
-	uint8_t buff[2 + 2 * 32];
+	uint8_t buff[2 + 4 * 32];
 	tBleStatus ret;
 
 	HOST_TO_LE_16(buff, (HAL_GetTick() >> 3));
 
 	for (int i = 0; i < 32; ++i) {
-		HOST_TO_LE_16(buff + 2 * (i + 1), (uint16_t)x_axes->before[i]);
-	}
-
-	for (int i = 0; i < 32; ++i) {
-		HOST_TO_LE_16(buff + 64 + 2 * (i + 1), (uint16_t)x_axes->after[i]);
+		HOST_TO_LE_16(buff + 2 + 4 * i, (uint32_t)x_axes->before[i]);
 	}
 
 	ret = aci_gatt_update_char_value_ext_IDB05A1(
-		HWServW2STHandle, AccGyroMagCharHandle, NOTIFICATION, 8, 0, 2 + 2 * 64, buff
+		HWServW2STHandle, AccGyroMagCharHandle, NOTIFICATION, 8, 0, 2 + 4 * 32, buff
 	);
 	if (ret != BLE_STATUS_SUCCESS) {
 		PRINTF("Error while updating Acceleration characteristic: 0x%02X\n", ret);

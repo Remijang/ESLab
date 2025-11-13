@@ -703,6 +703,12 @@ void Task_BLE_Func(void *argument) {
 		}
 		printf("\n");
 		MX_BlueNRG_MS_Process();
+		/*
+		for (int i = 0; i < blockSize; ++i) {
+			x_axes.before[i] = x_axes.after[i];
+		}
+		MX_BlueNRG_MS_Process();
+		*/
 	}
 }
 
