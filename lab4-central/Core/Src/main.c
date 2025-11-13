@@ -671,8 +671,8 @@ void Task_ACC_Func(void *argument) {
 void Task_Freq_Func(void *argument) {
 	for (uint16_t freq = 5; freq <= 20; freq += 5) {
 		uint8_t data[2];
-		data[0] = freq / 10 + '0';
-		data[1] = (freq % 10) + '0';
+		data[0] = freq;
+		data[1] = freq >> 8;
 		MX_Write_Data(FrequencyHandle + 1, data, 2);
 		THREAD_PRINTF("Frequency Updated: %d\n", freq);
 		osDelay(osKernelGetTickFreq() * 10);

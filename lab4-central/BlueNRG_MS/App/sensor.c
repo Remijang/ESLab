@@ -358,8 +358,8 @@ void Notification_Handler(evt_gatt_attr_notification *data) {
 	if (data->attr_handle != AcceleratoHandle + 1)
 		return;
 	THREAD_PRINTF("    Get Accelerato Notification: ");
-	THREAD_PRINTF(
-		"%c%c %c%c %c%c\n", data->attr_value[2], data->attr_value[3], data->attr_value[4],
-		data->attr_value[5], data->attr_value[6], data->attr_value[7]
-	);
+	uint16_t x = data->attr_value[2] | (((uint16_t)data->attr_value[3]) << 8);
+	uint16_t y = data->attr_value[4] | (((uint16_t)data->attr_value[5]) << 8);
+	uint16_t z = data->attr_value[6] | (((uint16_t)data->attr_value[7]) << 8);
+	THREAD_PRINTF("%d %d %d\n", x, y, z);
 }

@@ -302,7 +302,7 @@ void Read_Request_CB(uint16_t handle) {
 void Frequency_Update(uint16_t *freq, uint8_t *data, uint8_t length) {
 	if (!freq || !data)
 		return;
-	*freq = ((uint16_t)data[0]) << 8 + data[1];
+	*freq = data[0] + ((uint16_t)data[1]) << 8;
 	PRINTF("New frequency: %d\n", *freq);
 }
 
