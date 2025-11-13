@@ -176,6 +176,9 @@ void user_notify(void *pData) {
 					evt_gatt_procedure_complete *data = (void *)blue_evt->data;
 					GATT_Procedure_Complete_CB(data);
 				} break;
+				case EVT_BLUE_GATT_ERROR_RESP: {
+					THREAD_PRINTF("Descriptor write failed (error response)\n");
+				} break;
 				case EVT_BLUE_GATT_DISC_READ_CHAR_BY_UUID_RESP: {
 					evt_gatt_disc_read_char_by_uuid_resp *data = (void *)blue_evt->data;
 					GATT_Discover_Read_Char_By_UUID_CB(data);
@@ -313,14 +316,14 @@ void ATT_Find_Info_CB(evt_att_find_information_resp *data) {
 		THREAD_PRINTF("%02X", data->handle_uuid_pair[2 + i]);
 	}
 	THREAD_PRINTF("\n");
-
 	UUID_t uuid;
 	if (target_type == UUID_TYPE_128) {
 		for (int i = 0; i < 16; i++) {
 			uuid.UUID_128[i] = data->handle_uuid_pair[2 + 15 - i];
 		}
 		if (data->format != 1 &&
-			Is_Identical_UUID(target_uuid, uuid, UUID_TYPE_128, false)) {
+			Is_Identical_UUID(target_uuid, uuid, UUID_TYPE_128, false) &&
+			DiscoveredHandle == 0) {
 			DiscoveredHandle = *(uint16_t *)data->handle_uuid_pair;
 		}
 		return;
@@ -329,7 +332,8 @@ void ATT_Find_Info_CB(evt_att_find_information_resp *data) {
 		Is_Identical_UUID(
 			target_uuid, (UUID_t)(*(uint16_t *)(data->handle_uuid_pair + 2)),
 			UUID_TYPE_16, false
-		)) {
+		) &&
+		DiscoveredHandle == 0) {
 		DiscoveredHandle = *(uint16_t *)data->handle_uuid_pair;
 	}
 	return;
@@ -361,5 +365,5 @@ void Notification_Handler(evt_gatt_attr_notification *data) {
 	uint16_t x = data->attr_value[2] | (((uint16_t)data->attr_value[3]) << 8);
 	uint16_t y = data->attr_value[4] | (((uint16_t)data->attr_value[5]) << 8);
 	uint16_t z = data->attr_value[6] | (((uint16_t)data->attr_value[7]) << 8);
-	THREAD_PRINTF("%d %d %d\n", x, y, z);
+	THREAD_PRINTF("%d %d %d\n", (int16_t)x, (int16_t)y, (int16_t)z);
 }

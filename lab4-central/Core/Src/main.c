@@ -724,6 +724,7 @@ void Task_Scan_Func(void *argument) {
 	}
 	msg--;
 	FrequencyHandle = DiscoveredHandle;
+	DiscoveredHandle = 0x0000;
 	MX_Enable_Notification(AcceleratoHandle);
 	osThreadExit();
 }

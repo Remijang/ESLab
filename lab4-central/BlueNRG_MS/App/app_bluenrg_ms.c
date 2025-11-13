@@ -285,7 +285,7 @@ void MX_Enable_Notification(uint16_t char_handle) {
 	target_uuid.UUID_16 = 0x2902;
 	DiscoveredHandle = 0x0000;
 	tBleStatus ret =
-		aci_gatt_disc_all_charac_descriptors(connection_handle, char_handle, 0xFFFF);
+		aci_gatt_disc_all_charac_descriptors(connection_handle, char_handle + 1, 0xFFFF);
 	if (ret != BLE_STATUS_SUCCESS) {
 		THREAD_PRINTF("Failed to find notification handle: 0x%02X\n", ret);
 	} else {
