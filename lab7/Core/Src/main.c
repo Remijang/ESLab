@@ -24,9 +24,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "stdio.h"
 #include "arm_math.h"
 #include "math_helper.h"
+#include "stdio.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -36,9 +36,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define SNR_THRESHOLD_F32    140.0f
-#define BLOCK_SIZE            32
-#define NUM_TAPS              29
+#define SNR_THRESHOLD_F32 140.0f
+#define BLOCK_SIZE 32
+#define NUM_TAPS 29
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -102,17 +102,19 @@ float32_t output[BLOCK_SIZE];
 static float32_t firStateF32[BLOCK_SIZE + NUM_TAPS - 1];
 
 const float32_t firCoeffs32[NUM_TAPS] = {
-  -0.0018225230f, -0.0015879294f, +0.0000000000f, +0.0036977508f, +0.0080754303f, +0.0085302217f, -0.0000000000f, -0.0173976984f,
-  -0.0341458607f, -0.0333591565f, +0.0000000000f, +0.0676308395f, +0.1522061835f, +0.2229246956f, +0.2504960933f, +0.2229246956f,
-  +0.1522061835f, +0.0676308395f, +0.0000000000f, -0.0333591565f, -0.0341458607f, -0.0173976984f, -0.0000000000f, +0.0085302217f,
-  +0.0080754303f, +0.0036977508f, +0.0000000000f, -0.0015879294f, -0.0018225230f
+	-0.0018225230f, -0.0015879294f, +0.0000000000f, +0.0036977508f, +0.0080754303f,
+	+0.0085302217f, -0.0000000000f, -0.0173976984f, -0.0341458607f, -0.0333591565f,
+	+0.0000000000f, +0.0676308395f, +0.1522061835f, +0.2229246956f, +0.2504960933f,
+	+0.2229246956f, +0.1522061835f, +0.0676308395f, +0.0000000000f, -0.0333591565f,
+	-0.0341458607f, -0.0173976984f, -0.0000000000f, +0.0085302217f, +0.0080754303f,
+	+0.0036977508f, +0.0000000000f, -0.0015879294f, -0.0018225230f
 };
 
 uint32_t blockSize = BLOCK_SIZE;
 
 arm_fir_instance_f32 S;
 arm_status status;
-float32_t  *inputF32, *outputF32;
+float32_t *inputF32, *outputF32;
 
 #define timerDelay 100U
 /* USER CODE END PV */
@@ -182,7 +184,9 @@ int main(void) {
 	inputF32 = &input[0];
 	outputF32 = &output[0];
 
-	arm_fir_init_f32(&S, NUM_TAPS, (float32_t *)&firCoeffs32[0], &firStateF32[0], blockSize);
+	arm_fir_init_f32(
+		&S, NUM_TAPS, (float32_t *)&firCoeffs32[0], &firStateF32[0], blockSize
+	);
 
 	osKernelInitialize();
 	sem0 = osSemaphoreNew(1U, 0U, &binarySem_attributes0);
@@ -474,24 +478,29 @@ static void MX_GPIO_Init(void) {
 	__HAL_RCC_GPIOD_CLK_ENABLE();
 
 	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(GPIOE,
-					  M24SR64_Y_RF_DISABLE_Pin | M24SR64_Y_GPO_Pin | ISM43362_RST_Pin,
-					  GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(
+		GPIOE, M24SR64_Y_RF_DISABLE_Pin | M24SR64_Y_GPO_Pin | ISM43362_RST_Pin,
+		GPIO_PIN_RESET
+	);
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(
-		GPIOA, ARD_D10_Pin | SPBTLE_RF_RST_Pin | ARD_D9_Pin, GPIO_PIN_RESET);
+		GPIOA, ARD_D10_Pin | SPBTLE_RF_RST_Pin | ARD_D9_Pin, GPIO_PIN_RESET
+	);
 
 	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(GPIOB,
-					  ARD_D8_Pin | ISM43362_BOOT0_Pin | ISM43362_WAKEUP_Pin |
-						  SPSGRF_915_SDN_Pin | ARD_D5_Pin,
-					  GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(
+		GPIOB,
+		ARD_D8_Pin | ISM43362_BOOT0_Pin | ISM43362_WAKEUP_Pin | SPSGRF_915_SDN_Pin |
+			ARD_D5_Pin,
+		GPIO_PIN_RESET
+	);
 
 	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(GPIOD,
-					  USB_OTG_FS_PWR_EN_Pin | PMOD_RESET_Pin | STSAFE_A100_RESET_Pin,
-					  GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(
+		GPIOD, USB_OTG_FS_PWR_EN_Pin | PMOD_RESET_Pin | STSAFE_A100_RESET_Pin,
+		GPIO_PIN_RESET
+	);
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(SPBTLE_RF_SPI3_CSN_GPIO_Port, SPBTLE_RF_SPI3_CSN_Pin, GPIO_PIN_SET);
@@ -501,7 +510,8 @@ static void MX_GPIO_Init(void) {
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(
-		SPSGRF_915_SPI3_CSN_GPIO_Port, SPSGRF_915_SPI3_CSN_Pin, GPIO_PIN_SET);
+		SPSGRF_915_SPI3_CSN_GPIO_Port, SPSGRF_915_SPI3_CSN_Pin, GPIO_PIN_SET
+	);
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(ISM43362_SPI3_CSN_GPIO_Port, ISM43362_SPI3_CSN_Pin, GPIO_PIN_SET);
@@ -697,9 +707,10 @@ void Task_BLE_Func(void *argument) {
 	for (;;) {
 		osSemaphoreAcquire(sem2, osWaitForever);
 		for (int i = 0; i < blockSize; ++i) {
-			x_axes.before[i] = (int) input[i];
-			x_axes.after[i] = (int) output[i];
-			printf("(%.2f, %.2f) ", input[i], output[i]);
+			x_axes.before[i] = *(uint32_t *)&input[i];
+			x_axes.after[i] = *(uint32_t *)&output[i];
+			printf("(%.2f, %.2f)\n", input[i], output[i]);
+			printf("(%x, %x)\n", input[i], output[i]);
 		}
 		printf("\n");
 		MX_BlueNRG_MS_Process();

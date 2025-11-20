@@ -143,7 +143,7 @@ tBleStatus Add_HWServW2ST_Service(void) {
 	COPY_ACC_GYRO_MAG_W2ST_CHAR_UUID(uuid);
 	BLUENRG_memcpy(&char_uuid.Char_UUID_128, uuid, 16);
 	ret = aci_gatt_add_char(
-		HWServW2STHandle, UUID_TYPE_128, char_uuid.Char_UUID_128, 2 + 32 * 4,
+		HWServW2STHandle, UUID_TYPE_128, char_uuid.Char_UUID_128, 1 + 4 * 4,
 		CHAR_PROP_NOTIFY | CHAR_PROP_READ, ATTR_PERMISSION_NONE,
 		GATT_NOTIFY_READ_REQ_AND_WAIT_FOR_APPL_RESP, 16, 0, &AccGyroMagCharHandle
 	);
@@ -207,21 +207,34 @@ fail:
  * @retval tBleStatus Status
  */
 tBleStatus Acc_Update(AxesRaw_t *x_axes) {
-	uint8_t buff[2 + 4 * 32];
+	uint8_t buff[1 + 4 * 4];
 	tBleStatus ret;
-
-	HOST_TO_LE_16(buff, (HAL_GetTick() >> 3));
-
-	for (int i = 0; i < 32; ++i) {
-		HOST_TO_LE_16(buff + 2 + 4 * i, (uint32_t)x_axes->before[i]);
+	for (int idx = 0; idx < 8; idx++) {
+		buff[0] = (uint8_t)idx;
+		for (int i = 0; i < 4; ++i) {
+			HOST_TO_LE_32(buff + 1 + 4 * i, (uint32_t)x_axes->before[4 * idx + i]);
+		}
+		ret = aci_gatt_update_char_value_ext_IDB05A1(
+			HWServW2STHandle, AccGyroMagCharHandle, NOTIFICATION, 17, 0, 17, buff
+		);
+		if (ret != BLE_STATUS_SUCCESS) {
+			PRINTF("Error while updating Acceleration characteristic: 0x%02X\n", ret);
+			return BLE_STATUS_ERROR;
+		}
 	}
+	for (int idx = 0; idx < 8; idx++) {
+		buff[0] = (uint8_t)(idx + 8);
+		for (int i = 0; i < 4; ++i) {
+			HOST_TO_LE_32(buff + 1 + 4 * i, (uint32_t)x_axes->after[4 * idx + i]);
+		}
 
-	ret = aci_gatt_update_char_value_ext_IDB05A1(
-		HWServW2STHandle, AccGyroMagCharHandle, NOTIFICATION, 8, 0, 2 + 4 * 32, buff
-	);
-	if (ret != BLE_STATUS_SUCCESS) {
-		PRINTF("Error while updating Acceleration characteristic: 0x%02X\n", ret);
-		return BLE_STATUS_ERROR;
+		ret = aci_gatt_update_char_value_ext_IDB05A1(
+			HWServW2STHandle, AccGyroMagCharHandle, NOTIFICATION, 17, 0, 17, buff
+		);
+		if (ret != BLE_STATUS_SUCCESS) {
+			PRINTF("Error while updating Acceleration characteristic: 0x%02X\n", ret);
+			return BLE_STATUS_ERROR;
+		}
 	}
 
 	return BLE_STATUS_SUCCESS;
@@ -233,48 +246,6 @@ tBleStatus Acc_Update(AxesRaw_t *x_axes) {
  * @retval tBleStatus      Status
  */
 tBleStatus Quat_Update(AxesRaw_t *data) {
-	/*
-	tBleStatus ret;
-	uint8_t buff[2 + 6 * SEND_N_QUATERNIONS];
-
-	HOST_TO_LE_16(buff, (HAL_GetTick() >> 3));
-
-#if SEND_N_QUATERNIONS == 1
-	HOST_TO_LE_16(buff + 2, data[0].AXIS_X);
-	HOST_TO_LE_16(buff + 4, data[0].AXIS_Y);
-	HOST_TO_LE_16(buff + 6, data[0].AXIS_Z);
-#elif SEND_N_QUATERNIONS == 2
-	HOST_TO_LE_16(buff + 2, data[0].AXIS_X);
-	HOST_TO_LE_16(buff + 4, data[0].AXIS_Y);
-	HOST_TO_LE_16(buff + 6, data[0].AXIS_Z);
-
-	HOST_TO_LE_16(buff + 8, data[1].AXIS_X);
-	HOST_TO_LE_16(buff + 10, data[1].AXIS_Y);
-	HOST_TO_LE_16(buff + 12, data[1].AXIS_Z);
-#elif SEND_N_QUATERNIONS == 3
-	HOST_TO_LE_16(buff + 2, data[0].AXIS_X);
-	HOST_TO_LE_16(buff + 4, data[0].AXIS_Y);
-	HOST_TO_LE_16(buff + 6, data[0].AXIS_Z);
-
-	HOST_TO_LE_16(buff + 8, data[1].AXIS_X);
-	HOST_TO_LE_16(buff + 10, data[1].AXIS_Y);
-	HOST_TO_LE_16(buff + 12, data[1].AXIS_Z);
-
-	HOST_TO_LE_16(buff + 14, data[2].AXIS_X);
-	HOST_TO_LE_16(buff + 16, data[2].AXIS_Y);
-	HOST_TO_LE_16(buff + 18, data[2].AXIS_Z);
-#else
-	#error SEND_N_QUATERNIONS could be only 1,2,3
-#endif
-
-	ret = aci_gatt_update_char_value(
-		SWServW2STHandle, QuaternionsCharHandle, 0, 2 + 6 * SEND_N_QUATERNIONS, buff
-	);
-	if (ret != BLE_STATUS_SUCCESS) {
-		PRINTF("Error while updating Sensor Fusion characteristic: 0x%02X\n", ret);
-		return BLE_STATUS_ERROR;
-	}
-	*/
 	return BLE_STATUS_SUCCESS;
 }
 
