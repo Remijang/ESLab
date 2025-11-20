@@ -179,7 +179,7 @@ int main(void) {
 	ACC_InitGPIO();
 
 	/* USER CODE BEGIN 2 */
-	freq = 32;
+	freq = 4;
 
 	inputF32 = &input[0];
 	outputF32 = &output[0];

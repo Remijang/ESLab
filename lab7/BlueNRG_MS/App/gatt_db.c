@@ -219,7 +219,8 @@ tBleStatus Acc_Update(AxesRaw_t *x_axes) {
 		);
 		if (ret != BLE_STATUS_SUCCESS) {
 			PRINTF("Error while updating Acceleration characteristic: 0x%02X\n", ret);
-			return BLE_STATUS_ERROR;
+			idx--;
+			// return BLE_STATUS_ERROR;
 		}
 	}
 	for (int idx = 0; idx < 8; idx++) {
@@ -233,7 +234,8 @@ tBleStatus Acc_Update(AxesRaw_t *x_axes) {
 		);
 		if (ret != BLE_STATUS_SUCCESS) {
 			PRINTF("Error while updating Acceleration characteristic: 0x%02X\n", ret);
-			return BLE_STATUS_ERROR;
+			idx--;
+			// return BLE_STATUS_ERROR;
 		}
 	}
 
