@@ -20,13 +20,16 @@
 #include "main.h"
 
 #include "app_bluenrg_ms.h"
-#include "cmsis_os2.h"
+#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "arm_math.h"
+#include "gatt_db.h"
 #include "math_helper.h"
 #include "stdio.h"
+#include "usbd_core.h"
+#include "usbd_def.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,6 +49,7 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+
 DFSDM_Channel_HandleTypeDef hdfsdm1_channel1;
 
 I2C_HandleTypeDef hi2c2;
@@ -58,6 +62,7 @@ UART_HandleTypeDef huart3;
 
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
+/* USER CODE BEGIN PV */
 osThreadId_t tid1;
 const osThreadAttr_t task1_attributes = {
 	.name = "Task_ACC",
@@ -86,11 +91,6 @@ osSemaphoreId_t sem2;
 const osSemaphoreAttr_t binarySem_attributes2 = {.name = "Sem2"};
 osTimerId_t timer;
 const osTimerAttr_t timer_attributes = {.name = "Timer"};
-
-/* USER CODE BEGIN PV */
-// UART_HandleTypeDef huart1;
-
-/* USER CODE BEGIN PV */
 uint16_t freq;
 extern AxesRaw_t x_axes;
 int16_t pDataXYZ[3];
@@ -128,12 +128,12 @@ static void MX_QUADSPI_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_TIM16_Init(void);
-void ACC_InitGPIO(void);
+
+/* USER CODE BEGIN PFP */
 void Task_ACC_Func(void *argument);
 void Task_DSP_Func(void *argument);
 void Task_BLE_Func(void *argument);
 void Timer_Callback(void *argument);
-/* USER CODE BEGIN PFP */
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -175,9 +175,6 @@ int main(void) {
 	MX_USB_OTG_FS_PCD_Init();
 	MX_TIM16_Init();
 	MX_BlueNRG_MS_Init();
-	BSP_ACCELERO_Init();
-	ACC_InitGPIO();
-
 	/* USER CODE BEGIN 2 */
 	freq = 4;
 
@@ -188,23 +185,59 @@ int main(void) {
 		&S, NUM_TAPS, (float32_t *)&firCoeffs32[0], &firStateF32[0], blockSize
 	);
 
+	/* USER CODE END 2 */
+
+	/* Init scheduler */
 	osKernelInitialize();
+
+	/* USER CODE BEGIN RTOS_MUTEX */
+	/* add mutexes, ... */
+
+	/* USER CODE END RTOS_MUTEX */
+
+	/* USER CODE BEGIN RTOS_SEMAPHORES */
+	/* add semaphores, ... */
 	sem0 = osSemaphoreNew(1U, 0U, &binarySem_attributes0);
 	sem1 = osSemaphoreNew(1U, 0U, &binarySem_attributes1);
 	sem2 = osSemaphoreNew(1U, 0U, &binarySem_attributes2);
+	/* USER CODE END RTOS_SEMAPHORES */
+
+	/* USER CODE BEGIN RTOS_TIMERS */
+	/* start timers, add new ones, ... */
 	timer = osTimerNew(Timer_Callback, osTimerPeriodic, NULL, &timer_attributes);
+	osTimerStart(timer, timerDelay);
+	/* USER CODE END RTOS_TIMERS */
+
+	/* USER CODE BEGIN RTOS_QUEUES */
+	/* add queues, ... */
+	/* USER CODE END RTOS_QUEUES */
+
+	/* Create the thread(s) */
+	/* creation of defaultTask */
+
+	/* USER CODE BEGIN RTOS_THREADS */
+	/* add threads, ... */
 	tid1 = osThreadNew(Task_ACC_Func, NULL, &task1_attributes);
 	tid2 = osThreadNew(Task_DSP_Func, NULL, &task2_attributes);
 	tid3 = osThreadNew(Task_BLE_Func, NULL, &task3_attributes);
+	/* USER CODE END RTOS_THREADS */
 
-	osTimerStart(timer, timerDelay);
+	/* USER CODE BEGIN RTOS_EVENTS */
+	/* add events, ... */
+	/* USER CODE END RTOS_EVENTS */
+
+	/* Start scheduler */
 	osKernelStart();
 
-	/* USER CODE END 2 */
+	/* We should never get here as control is now taken by the scheduler */
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
-	while (1) {}
+	while (1) {
+		/* USER CODE END WHILE */
+
+		/* USER CODE BEGIN 3 */
+	}
 	/* USER CODE END 3 */
 }
 
@@ -448,9 +481,9 @@ static void MX_USB_OTG_FS_PCD_Init(void) {
 	hpcd_USB_OTG_FS.Init.Sof_enable = DISABLE;
 	hpcd_USB_OTG_FS.Init.low_power_enable = DISABLE;
 	hpcd_USB_OTG_FS.Init.lpm_enable = DISABLE;
-	hpcd_USB_OTG_FS.Init.battery_charging_enable = DISABLE;
+	hpcd_USB_OTG_FS.Init.battery_charging_enable = ENABLE;
 	hpcd_USB_OTG_FS.Init.use_dedicated_ep1 = DISABLE;
-	hpcd_USB_OTG_FS.Init.vbus_sensing_enable = DISABLE;
+	hpcd_USB_OTG_FS.Init.vbus_sensing_enable = ENABLE;
 	if (HAL_PCD_Init(&hpcd_USB_OTG_FS) != HAL_OK) {
 		Error_Handler();
 	}
@@ -656,10 +689,10 @@ static void MX_GPIO_Init(void) {
 	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 	/* EXTI interrupt init*/
-	HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+	HAL_NVIC_SetPriority(EXTI9_5_IRQn, 5, 0);
 	HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
-	HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+	HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
 	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 	/* USER CODE BEGIN MX_GPIO_Init_2 */
@@ -710,7 +743,6 @@ void Task_BLE_Func(void *argument) {
 			x_axes.before[i] = *(uint32_t *)&input[i];
 			x_axes.after[i] = *(uint32_t *)&output[i];
 			printf("(%.2f, %.2f)\n", input[i], output[i]);
-			printf("(%x, %x)\n", input[i], output[i]);
 		}
 		printf("\n");
 		MX_BlueNRG_MS_Process();
@@ -727,6 +759,22 @@ void Timer_Callback(void *argument) {
 	osSemaphoreRelease(sem0);
 }
 /* USER CODE END 4 */
+
+/* USER CODE BEGIN Header_StartDefaultTask */
+/**
+ * @brief  Function implementing the defaultTask thread.
+ * @param  argument: Not used
+ * @retval None
+ */
+/* USER CODE END Header_StartDefaultTask */
+void StartDefaultTask(void *argument) {
+	/* USER CODE BEGIN 5 */
+	/* Infinite loop */
+	for (;;) {
+		osDelay(1);
+	}
+	/* USER CODE END 5 */
+}
 
 /**
  * @brief  This function is executed in case of error occurrence.
