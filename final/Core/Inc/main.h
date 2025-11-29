@@ -33,6 +33,9 @@ extern "C" {
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stm32l475e_iot01_accelero.h"
+#include "usbd_core.h"
+#include "usbd_desc.h"
+#include "usbd_hid.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -221,7 +224,7 @@ void Error_Handler(void);
 #define ISM43362_DRDY_EXTI1_GPIO_Port GPIOE
 
 /* USER CODE BEGIN Private defines */
-
+#define USB_USE_LSE_MSI_CLOCK
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
