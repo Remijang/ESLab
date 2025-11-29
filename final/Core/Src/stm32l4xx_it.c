@@ -45,7 +45,7 @@
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
 uint8_t HID_Buffer[4];
-extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
+extern PCD_HandleTypeDef hpcd;
 extern USBD_HandleTypeDef USBD_Device;
 /* USER CODE END PV */
 
@@ -222,7 +222,7 @@ void OTG_FS_IRQHandler(void) {
 	/* USER CODE BEGIN OTG_FS_IRQn 0 */
 
 	/* USER CODE END OTG_FS_IRQn 0 */
-	HAL_PCD_IRQHandler(&hpcd_USB_OTG_FS);
+	HAL_PCD_IRQHandler(&hpcd);
 	/* USER CODE BEGIN OTG_FS_IRQn 1 */
 
 	/* USER CODE END OTG_FS_IRQn 1 */

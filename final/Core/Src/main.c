@@ -129,7 +129,6 @@ static void MX_DFSDM1_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_QUADSPI_Init(void);
 static void MX_USART3_UART_Init(void);
-static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_TIM16_Init(void);
 
 /* USER CODE BEGIN PFP */
@@ -175,15 +174,10 @@ int main(void) {
 	MX_I2C2_Init();
 	MX_QUADSPI_Init();
 	MX_USART3_UART_Init();
-	MX_USB_OTG_FS_PCD_Init();
 	MX_TIM16_Init();
 	MX_BlueNRG_MS_Init();
-	BSP_LED_Init(LED2);
-	/* Enable Power Clock*/
-	__HAL_RCC_PWR_CLK_ENABLE();
 
-	/* Enable USB power on Pwrctrl CR2 register */
-	HAL_PWREx_EnableVddUSB();
+	BSP_LED_Init(LED2);
 
 	/* Init Device Library */
 	USBD_StatusTypeDef ret = USBD_Init(&USBD_Device, &HID_Desc, 0);
@@ -192,7 +186,8 @@ int main(void) {
 	ret = USBD_RegisterClass(&USBD_Device, USBD_HID_CLASS);
 	printf("Ret val %d\n", ret);
 	/* Start Device Process */
-	USBD_Start(&USBD_Device);
+	ret = USBD_Start(&USBD_Device);
+	printf("Ret val %d\n", ret);
 	/* USER CODE BEGIN 2 */
 	freq = 4;
 
@@ -264,140 +259,66 @@ int main(void) {
  * @retval None
  */
 void SystemClock_Config(void) {
-	RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-	RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+    RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+    RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+    RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0}; // Important: Init to 0
 
-	/** Configure the main internal regulator output voltage
-	 */
-	if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK) {
-		Error_Handler();
-	}
+    /** Configure the main internal regulator output voltage */
+    if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK) {
+        Error_Handler();
+    }
 
-	// /** Initializes the RCC Oscillators according to the specified parameters
-	//  * in the RCC_OscInitTypeDef structure.
-	//  */
-	// RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
-	// RCC_OscInitStruct.MSIState = RCC_MSI_ON;
-	// RCC_OscInitStruct.MSICalibrationValue = 0;
-	// RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;
-	// RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-	// RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_MSI;
-	// RCC_OscInitStruct.PLL.PLLM = 1;
-	// RCC_OscInitStruct.PLL.PLLN = 40;
-	// RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV7;
-	// RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
-	// RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
-	// if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
-	// 	Error_Handler();
-	// }
+    /** 1. Configure Oscillators and MAIN PLL
+     *  (PLLSAI1 Source and M divider are derived from this!)
+     */
+    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
+    RCC_OscInitStruct.MSIState = RCC_MSI_ON;
+    RCC_OscInitStruct.MSICalibrationValue = 0;
+    RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6; // 4 MHz
 
-	// /** Initializes the CPU, AHB and APB buses clocks
-	//  */
-	// RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
-	// 							  RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
-	// RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-	// RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-	// RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-	// RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_MSI;
+    RCC_OscInitStruct.PLL.PLLM = 1;             // Shared M divider
+    RCC_OscInitStruct.PLL.PLLN = 40;            // Main PLL N = 40 -> 160MHz VCO
+    RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV7;
+    RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
+    RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2; // 80MHz SysClk
 
-	// if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK) {
-	// 	Error_Handler();
-	// }
+    if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+        Error_Handler();
+    }
 
-	RCC_PeriphCLKInitTypeDef PeriphClkInitStruct;
+    /** 2. Configure Bus Clocks */
+    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
+                                  RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-#if defined(USB_USE_LSE_MSI_CLOCK)
+    if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK) {
+        Error_Handler();
+    }
 
-	/* Enable the LSE Oscillator */
-	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE;
-	RCC_OscInitStruct.LSEState = RCC_LSE_ON;
-	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_OFF;
-	HAL_RCC_OscConfig(&RCC_OscInitStruct);
-
-	/* Enable the CSS interrupt in case LSE signal is corrupted or not present */
-	HAL_RCCEx_DisableLSECSS();
-
-	/* Enable MSI Oscillator and activate PLL with MSI as source */
-	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
-	RCC_OscInitStruct.MSIState = RCC_MSI_ON;
-	RCC_OscInitStruct.HSICalibrationValue = RCC_MSICALIBRATION_DEFAULT;
-	RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_11;
-	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_MSI;
-	RCC_OscInitStruct.PLL.PLLM = 6;
-	RCC_OscInitStruct.PLL.PLLN = 40;
-	RCC_OscInitStruct.PLL.PLLP = 7;
-	RCC_OscInitStruct.PLL.PLLQ = 4;
-	RCC_OscInitStruct.PLL.PLLR = 4;
-	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
-		Error_Handler();
-	}
-
-	/* Enable MSI Auto-calibration through LSE */
-	HAL_RCCEx_EnableMSIPLLMode();
-
-	/* Select MSI output as USB clock source */
-	PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USB;
-	PeriphClkInitStruct.UsbClockSelection = RCC_USBCLKSOURCE_MSI;
-	HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct);
-
-	/* Select PLL as system clock source and configure the HCLK, PCLK1 and PCLK2
-	clocks dividers */
-	RCC_ClkInitStruct.ClockType =
-		(RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_PCLK1 |
-		 RCC_CLOCKTYPE_PCLK2);
-	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
-	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK) {
-		Error_Handler();
-	}
-
-#elif defined(USB_USE_HSE_CLOCK)
-
-	/* Enable HSE Oscillator and activate PLL with HSE as source */
-	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-	RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-	RCC_OscInitStruct.PLL.PLLM = 1;
-	RCC_OscInitStruct.PLL.PLLN = 20;
-	RCC_OscInitStruct.PLL.PLLR = 2;
-	RCC_OscInitStruct.PLL.PLLP = 7;
-	RCC_OscInitStruct.PLL.PLLQ = 4;
-
-	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
-		Error_Handler();
-	}
-
-	/* Select PLLSAI output as USB clock source */
-	PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USB;
-	PeriphClkInitStruct.UsbClockSelection = RCC_USBCLKSOURCE_PLLSAI1;
-	PeriphClkInitStruct.PLLSAI1.PLLSAI1N = 24;
-	PeriphClkInitStruct.PLLSAI1.PLLSAI1Q = 4;
-	PeriphClkInitStruct.PLLSAI1.PLLSAI1P = 1;
-	PeriphClkInitStruct.PLLSAI1.PLLSAI1M = 1;
-	PeriphClkInitStruct.PLLSAI1.PLLSAI1Source = RCC_PLLSOURCE_HSE;
-	PeriphClkInitStruct.PLLSAI1.PLLSAI1ClockOut = RCC_PLLSAI1_48M2CLK;
-	if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK) {
-		Error_Handler();
-	}
-
-	/* Select PLL as system clock source and configure the HCLK, PCLK1 and PCLK2
-	clocks dividers */
-	RCC_ClkInitStruct.ClockType =
-		(RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_PCLK1 |
-		 RCC_CLOCKTYPE_PCLK2);
-	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV2;
-	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
-	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK) {
-		Error_Handler();
-	}
-
-#endif /* USB_USE_LSE_MSI_CLOCK */
+//    /** 3. Configure Peripheral Clocks & PLLSAI1
+//     *  The HAL checks .PLLSAI1.PLLSAI1N > 0 to decide if it should enable PLLSAI1.
+//     */
+//    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USB;
+//    PeriphClkInitStruct.UsbClockSelection = RCC_USBCLKSOURCE_PLLSAI1;
+//
+//    // --- PLLSAI1 Configuration lives HERE for STM32L4 ---
+//    // Source and M are shared with Main PLL (MSI, M=1)
+//    PeriphClkInitStruct.PLLSAI1.PLLSAI1Source = RCC_PLLSOURCE_MSI; // Some L4 HALs require this, some ignore it
+//    PeriphClkInitStruct.PLLSAI1.PLLSAI1M = 1;                     // Some L4 HALs require this
+//    PeriphClkInitStruct.PLLSAI1.PLLSAI1N = 24;      // 4MHz * 24 = 96MHz VCO
+//    PeriphClkInitStruct.PLLSAI1.PLLSAI1P = RCC_PLLP_DIV7;
+//    PeriphClkInitStruct.PLLSAI1.PLLSAI1Q = RCC_PLLQ_DIV2; // 96MHz / 2 = 48MHz (USB)
+//    PeriphClkInitStruct.PLLSAI1.PLLSAI1R = RCC_PLLR_DIV2;
+//    PeriphClkInitStruct.PLLSAI1.PLLSAI1ClockOut = RCC_PLLSAI1_48M2CLK; // Enable Q Output
+//
+//    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK) {
+//        Error_Handler();
+//    }
 }
 
 /**
@@ -562,37 +483,6 @@ static void MX_USART3_UART_Init(void) {
 	/* USER CODE BEGIN USART3_Init 2 */
 
 	/* USER CODE END USART3_Init 2 */
-}
-
-/**
- * @brief USB_OTG_FS Initialization Function
- * @param None
- * @retval None
- */
-static void MX_USB_OTG_FS_PCD_Init(void) {
-	/* USER CODE BEGIN USB_OTG_FS_Init 0 */
-
-	/* USER CODE END USB_OTG_FS_Init 0 */
-
-	/* USER CODE BEGIN USB_OTG_FS_Init 1 */
-
-	/* USER CODE END USB_OTG_FS_Init 1 */
-	hpcd_USB_OTG_FS.Instance = USB_OTG_FS;
-	hpcd_USB_OTG_FS.Init.dev_endpoints = 6;
-	hpcd_USB_OTG_FS.Init.speed = PCD_SPEED_FULL;
-	hpcd_USB_OTG_FS.Init.phy_itface = PCD_PHY_EMBEDDED;
-	hpcd_USB_OTG_FS.Init.Sof_enable = DISABLE;
-	hpcd_USB_OTG_FS.Init.low_power_enable = DISABLE;
-	hpcd_USB_OTG_FS.Init.lpm_enable = DISABLE;
-	hpcd_USB_OTG_FS.Init.battery_charging_enable = ENABLE;
-	hpcd_USB_OTG_FS.Init.use_dedicated_ep1 = DISABLE;
-	hpcd_USB_OTG_FS.Init.vbus_sensing_enable = ENABLE;
-	if (HAL_PCD_Init(&hpcd_USB_OTG_FS) != HAL_OK) {
-		Error_Handler();
-	}
-	/* USER CODE BEGIN USB_OTG_FS_Init 2 */
-
-	/* USER CODE END USB_OTG_FS_Init 2 */
 }
 
 /**
