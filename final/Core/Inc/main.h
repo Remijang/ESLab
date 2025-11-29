@@ -27,13 +27,12 @@ extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm32l4xx_hal.h"
-
-#include "hci_tl_interface.h"
 #include "b_l475e_iot01a1.h"
+#include "hci_tl_interface.h"
+#include "stm32l4xx_hal.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "stm32l475e_iot01_accelero.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
