@@ -19,7 +19,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32l4xx_it.h"
-
+#include "stdio.h"
 #include "FreeRTOS.h"
 #include "main.h"
 #include "task.h"

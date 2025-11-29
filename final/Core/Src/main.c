@@ -67,14 +67,14 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 osThreadId_t tid1;
 const osThreadAttr_t task1_attributes = {
 	.name = "Task_ACC",
-	.stack_size = 128 * 4,
+	.stack_size = 256 * 4,
 	.priority = (osPriority_t)osPriorityHigh,
 };
 /* Definitions for Task2 */
 osThreadId_t tid2;
 const osThreadAttr_t task2_attributes = {
 	.name = "Task_DSP",
-	.stack_size = 128 * 4,
+	.stack_size = 256 * 4,
 	.priority = (osPriority_t)osPriorityNormal,
 };
 /* Definitions for Task3 */
@@ -134,7 +134,7 @@ static void MX_TIM16_Init(void);
 /* USER CODE BEGIN PFP */
 void Task_ACC_Func(void *argument);
 void Task_DSP_Func(void *argument);
-void Task_BLE_Func(void *argument);
+void Task_USB_Func(void *argument);
 void Timer_Callback(void *argument);
 /* USER CODE END PFP */
 
@@ -179,15 +179,6 @@ int main(void) {
 
 	BSP_LED_Init(LED2);
 
-	/* Init Device Library */
-	USBD_StatusTypeDef ret = USBD_Init(&USBD_Device, &HID_Desc, 0);
-	printf("Ret val %d\n", ret);
-	/* Add Supported Class */
-	ret = USBD_RegisterClass(&USBD_Device, USBD_HID_CLASS);
-	printf("Ret val %d\n", ret);
-	/* Start Device Process */
-	ret = USBD_Start(&USBD_Device);
-	printf("Ret val %d\n", ret);
 	/* USER CODE BEGIN 2 */
 	freq = 4;
 
@@ -232,7 +223,7 @@ int main(void) {
 	/* add threads, ... */
 	tid1 = osThreadNew(Task_ACC_Func, NULL, &task1_attributes);
 	tid2 = osThreadNew(Task_DSP_Func, NULL, &task2_attributes);
-	tid3 = osThreadNew(Task_BLE_Func, NULL, &task3_attributes);
+	tid3 = osThreadNew(Task_USB_Func, NULL, &task3_attributes);
 	/* USER CODE END RTOS_THREADS */
 
 	/* USER CODE BEGIN RTOS_EVENTS */
@@ -240,6 +231,7 @@ int main(void) {
 	/* USER CODE END RTOS_EVENTS */
 
 	/* Start scheduler */
+	printf("got here\n");
 	osKernelStart();
 
 	/* We should never get here as control is now taken by the scheduler */
@@ -261,7 +253,6 @@ int main(void) {
 void SystemClock_Config(void) {
     RCC_OscInitTypeDef RCC_OscInitStruct = {0};
     RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-    RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0}; // Important: Init to 0
 
     /** Configure the main internal regulator output voltage */
     if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK) {
@@ -299,26 +290,6 @@ void SystemClock_Config(void) {
     if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK) {
         Error_Handler();
     }
-
-//    /** 3. Configure Peripheral Clocks & PLLSAI1
-//     *  The HAL checks .PLLSAI1.PLLSAI1N > 0 to decide if it should enable PLLSAI1.
-//     */
-//    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USB;
-//    PeriphClkInitStruct.UsbClockSelection = RCC_USBCLKSOURCE_PLLSAI1;
-//
-//    // --- PLLSAI1 Configuration lives HERE for STM32L4 ---
-//    // Source and M are shared with Main PLL (MSI, M=1)
-//    PeriphClkInitStruct.PLLSAI1.PLLSAI1Source = RCC_PLLSOURCE_MSI; // Some L4 HALs require this, some ignore it
-//    PeriphClkInitStruct.PLLSAI1.PLLSAI1M = 1;                     // Some L4 HALs require this
-//    PeriphClkInitStruct.PLLSAI1.PLLSAI1N = 24;      // 4MHz * 24 = 96MHz VCO
-//    PeriphClkInitStruct.PLLSAI1.PLLSAI1P = RCC_PLLP_DIV7;
-//    PeriphClkInitStruct.PLLSAI1.PLLSAI1Q = RCC_PLLQ_DIV2; // 96MHz / 2 = 48MHz (USB)
-//    PeriphClkInitStruct.PLLSAI1.PLLSAI1R = RCC_PLLR_DIV2;
-//    PeriphClkInitStruct.PLLSAI1.PLLSAI1ClockOut = RCC_PLLSAI1_48M2CLK; // Enable Q Output
-//
-//    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK) {
-//        Error_Handler();
-//    }
 }
 
 /**
@@ -729,16 +700,27 @@ void Task_DSP_Func(void *argument) {
 	}
 }
 
-void Task_BLE_Func(void *argument) {
+void Task_USB_Func(void *argument) {
+	//printf("got here\n");
+
+	/* Init Device Library */
+	USBD_StatusTypeDef ret = USBD_Init(&USBD_Device, &HID_Desc, 0);
+	//printf("Ret val %d\n", ret);
+	/* Add Supported Class */
+	ret = USBD_RegisterClass(&USBD_Device, USBD_HID_CLASS);
+	//printf("Ret val %d\n", ret);
+	/* Start Device Process */
+	ret = USBD_Start(&USBD_Device);
+	//printf("Ret val %d\n", ret);
 	for (;;) {
 		osSemaphoreAcquire(sem2, osWaitForever);
 		for (int i = 0; i < blockSize; ++i) {
 			x_axes.before[i] = *(uint32_t *)&input[i];
 			x_axes.after[i] = *(uint32_t *)&output[i];
-			printf("(%.2f, %.2f)\n", input[i], output[i]);
+			//printf("(%.2f, %.2f)\n", input[i], output[i]);
 		}
-		printf("\n");
-		MX_BlueNRG_MS_Process();
+		//printf("\n");
+		// MX_BlueNRG_MS_Process();
 		/*
 		for (int i = 0; i < blockSize; ++i) {
 			x_axes.before[i] = x_axes.after[i];
