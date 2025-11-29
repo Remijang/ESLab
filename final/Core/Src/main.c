@@ -68,7 +68,7 @@ osThreadId_t tid1;
 const osThreadAttr_t task1_attributes = {
 	.name = "Task_ACC",
 	.stack_size = 256 * 4,
-	.priority = (osPriority_t)osPriorityHigh,
+	.priority = (osPriority_t)osPriorityNormal,
 };
 /* Definitions for Task2 */
 osThreadId_t tid2;
@@ -135,7 +135,7 @@ static void MX_TIM16_Init(void);
 void Task_ACC_Func(void *argument);
 void Task_DSP_Func(void *argument);
 void Task_USB_Func(void *argument);
-void Timer_Callback(void *argument);
+// void Timer_Callback(void *argument);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -208,8 +208,8 @@ int main(void) {
 
 	/* USER CODE BEGIN RTOS_TIMERS */
 	/* start timers, add new ones, ... */
-	timer = osTimerNew(Timer_Callback, osTimerPeriodic, NULL, &timer_attributes);
-	osTimerStart(timer, timerDelay);
+	// timer = osTimerNew(Timer_Callback, osTimerPeriodic, NULL, &timer_attributes);
+	// osTimerStart(timer, timerDelay);
 	/* USER CODE END RTOS_TIMERS */
 
 	/* USER CODE BEGIN RTOS_QUEUES */
@@ -251,45 +251,45 @@ int main(void) {
  * @retval None
  */
 void SystemClock_Config(void) {
-    RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-    RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+	RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+	RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-    /** Configure the main internal regulator output voltage */
-    if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK) {
-        Error_Handler();
-    }
+	/** Configure the main internal regulator output voltage */
+	if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK) {
+		Error_Handler();
+	}
 
-    /** 1. Configure Oscillators and MAIN PLL
-     *  (PLLSAI1 Source and M divider are derived from this!)
-     */
-    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
-    RCC_OscInitStruct.MSIState = RCC_MSI_ON;
-    RCC_OscInitStruct.MSICalibrationValue = 0;
-    RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6; // 4 MHz
+	/** 1. Configure Oscillators and MAIN PLL
+	 *  (PLLSAI1 Source and M divider are derived from this!)
+	 */
+	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
+	RCC_OscInitStruct.MSIState = RCC_MSI_ON;
+	RCC_OscInitStruct.MSICalibrationValue = 0;
+	RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;  // 4 MHz
 
-    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_MSI;
-    RCC_OscInitStruct.PLL.PLLM = 1;             // Shared M divider
-    RCC_OscInitStruct.PLL.PLLN = 40;            // Main PLL N = 40 -> 160MHz VCO
-    RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV7;
-    RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
-    RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2; // 80MHz SysClk
+	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_MSI;
+	RCC_OscInitStruct.PLL.PLLM = 1;	  // Shared M divider
+	RCC_OscInitStruct.PLL.PLLN = 40;  // Main PLL N = 40 -> 160MHz VCO
+	RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV7;
+	RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
+	RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;	 // 80MHz SysClk
 
-    if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
-        Error_Handler();
-    }
+	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+		Error_Handler();
+	}
 
-    /** 2. Configure Bus Clocks */
-    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
-                                  RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
-    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+	/** 2. Configure Bus Clocks */
+	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
+								  RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-    if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK) {
-        Error_Handler();
-    }
+	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK) {
+		Error_Handler();
+	}
 }
 
 /**
@@ -679,11 +679,13 @@ void Task_ACC_Func(void *argument) {
 	int count = 0;
 	for (;;) {
 		osSemaphoreAcquire(sem0, osWaitForever);
+		uint16_t now = osKernelGetTickCount();
+		printf("%d\n", now);
 		BSP_ACCELERO_AccGetXYZ(pDataXYZ);
 		input[count] = pDataXYZ[0];
 		// x_axes.AXIS_Y = pDataXYZ[1];
 		// x_axes.AXIS_Z = pDataXYZ[2];
-		osDelay(osKernelGetTickFreq() / freq);
+		// osDelay(osKernelGetTickFreq() / freq);
 		count++;
 		if (count == blockSize) {
 			count = 0;
@@ -701,26 +703,28 @@ void Task_DSP_Func(void *argument) {
 }
 
 void Task_USB_Func(void *argument) {
-	//printf("got here\n");
+	// printf("got here\n");
 
 	/* Init Device Library */
 	USBD_StatusTypeDef ret = USBD_Init(&USBD_Device, &HID_Desc, 0);
-	//printf("Ret val %d\n", ret);
+
 	/* Add Supported Class */
 	ret = USBD_RegisterClass(&USBD_Device, USBD_HID_CLASS);
-	//printf("Ret val %d\n", ret);
+
 	/* Start Device Process */
 	ret = USBD_Start(&USBD_Device);
-	//printf("Ret val %d\n", ret);
+	osSemaphoreRelease(sem0);
 	for (;;) {
 		osSemaphoreAcquire(sem2, osWaitForever);
 		for (int i = 0; i < blockSize; ++i) {
 			x_axes.before[i] = *(uint32_t *)&input[i];
 			x_axes.after[i] = *(uint32_t *)&output[i];
-			//printf("(%.2f, %.2f)\n", input[i], output[i]);
+			// printf("(%.2f, %.2f)\n", input[i], output[i]);
 		}
-		//printf("\n");
-		// MX_BlueNRG_MS_Process();
+		osDelay(10);
+		osSemaphoreRelease(sem0);
+		// printf("\n");
+		//  MX_BlueNRG_MS_Process();
 		/*
 		for (int i = 0; i < blockSize; ++i) {
 			x_axes.before[i] = x_axes.after[i];
@@ -730,9 +734,11 @@ void Task_USB_Func(void *argument) {
 	}
 }
 
-void Timer_Callback(void *argument) {
-	osSemaphoreRelease(sem0);
-}
+// void Timer_Callback(void *argument) {
+// 	osSemaphoreRelease(sem0);
+// 	uint16_t now = osKernelGetTickCount();
+// 	printf("%d\n", now);
+// }
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */

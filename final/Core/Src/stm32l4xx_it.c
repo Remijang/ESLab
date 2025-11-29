@@ -19,9 +19,10 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32l4xx_it.h"
-#include "stdio.h"
+
 #include "FreeRTOS.h"
 #include "main.h"
+#include "stdio.h"
 #include "task.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -159,19 +160,19 @@ void SysTick_Handler(void) {
 #if (INCLUDE_xTaskGetSchedulerState == 1)
 	}
 #endif /* INCLUDE_xTaskGetSchedulerState */
-	   /* USER CODE BEGIN SysTick_IRQn 1 */
-	static __IO uint32_t counter = 0;
+	/* USER CODE BEGIN SysTick_IRQn 1 */
+	// static __IO uint32_t counter = 0;
 
-	/* check Joystick state every polling interval (10ms) */
-	if (counter++ == USBD_HID_GetPollingInterval(&USBD_Device)) {
-		GetPointerData(HID_Buffer);
+	// /* check Joystick state every polling interval (10ms) */
+	// if (counter++ == USBD_HID_GetPollingInterval(&USBD_Device)) {
+	// 	GetPointerData(HID_Buffer);
 
-		/* send data though IN endpoint*/
-		if ((HID_Buffer[1] != 0) || (HID_Buffer[2] != 0)) {
-			USBD_HID_SendReport(&USBD_Device, HID_Buffer, 4);
-		}
-		counter = 0;
-	}
+	// 	/* send data though IN endpoint*/
+	// 	if ((HID_Buffer[1] != 0) || (HID_Buffer[2] != 0)) {
+	// 		USBD_HID_SendReport(&USBD_Device, HID_Buffer, 4);
+	// 	}
+	// 	counter = 0;
+	// }
 	/* USER CODE END SysTick_IRQn 1 */
 }
 

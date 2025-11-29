@@ -76,10 +76,10 @@ static void SystemClockConfig_STOP(void);
 // 	/* Enable USB FS Interrupt */
 // 	HAL_NVIC_EnableIRQ(OTG_FS_IRQn);
 
-// 	if (hpcd->Init.low_power_enable == 1) {
-// 		/* Enable EXTI Line 18 for USB wakeup */
-// 		__HAL_USB_OTG_FS_WAKEUP_EXTI_ENABLE_IT();
-// 	}
+// if (hpcd->Init.low_power_enable == 1) {
+// 	/* Enable EXTI Line 18 for USB wakeup */
+// 	__HAL_USB_OTG_FS_WAKEUP_EXTI_ENABLE_IT();
+// }
 // }
 
 // /**
