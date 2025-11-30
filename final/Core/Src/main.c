@@ -59,26 +59,10 @@ TIM_HandleTypeDef htim16;
 
 UART_HandleTypeDef huart3;
 
-/* Definitions for defaultTask */
-/* Definitions for myTimer01 */
-osTimerId_t Timer;
-const osTimerAttr_t Timer_attributes = {.name = "Timer"};
-/* Definitions for Mutex1 */
-osMutexId_t Mutex1;
-const osMutexAttr_t Mutex1_attributes = {.name = "Mutex1"};
-/* Definitions for Mutex2 */
-osMutexId_t Mutex2;
-const osMutexAttr_t Mutex2_attributes = {.name = "Mutex2"};
 /* USER CODE BEGIN PV */
 osThreadId_t tid_send;
 const osThreadAttr_t TaskSend_attributes = {
 	.name = "TaskSend",
-	.stack_size = 256 * 4,
-	.priority = (osPriority_t)osPriorityLow,
-};
-osThreadId_t tid_data;
-const osThreadAttr_t TaskData_attributes = {
-	.name = "TaskData",
 	.stack_size = 256 * 4,
 	.priority = (osPriority_t)osPriorityLow,
 };
@@ -100,7 +84,6 @@ void Timer_CallBack(void *argument);
 /* USER CODE BEGIN PFP */
 void ACC_InitGPIO(void);
 void Task_Send(void *argument);
-void Task_Data(void *argument);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -143,58 +126,10 @@ int main(void) {
 	BSP_ACCELERO_Init();
 	ACC_InitGPIO();
 
-	/* USER CODE BEGIN 2 */
-	// freq = 4;
-
-	// inputF32 = &input[0];
-	// outputF32 = &output[0];
-
-	// arm_fir_init_f32(
-	// 	&S, NUM_TAPS, (float32_t *)&firCoeffs32[0], &firStateF32[0], blockSize
-	// );
-	/* USER CODE END 2 */
-
 	/* Init scheduler */
 	osKernelInitialize();
-	/* Create the mutex(es) */
-	/* creation of Mutex1 */
-	Mutex1 = osMutexNew(&Mutex1_attributes);
 
-	/* creation of Mutex2 */
-	Mutex2 = osMutexNew(&Mutex2_attributes);
-
-	/* USER CODE BEGIN RTOS_MUTEX */
-	/* add mutexes, ... */
-	/* USER CODE END RTOS_MUTEX */
-
-	/* USER CODE BEGIN RTOS_SEMAPHORES */
-	/* add semaphores, ... */
-	/* USER CODE END RTOS_SEMAPHORES */
-
-	/* Create the timer(s) */
-	/* creation of Timer */
-	Timer = osTimerNew(Timer_CallBack, osTimerPeriodic, NULL, &Timer_attributes);
-
-	/* USER CODE BEGIN RTOS_TIMERS */
-	/* start timers, add new ones, ... */
-	osTimerStart(Timer, timerDelay);
-	/* USER CODE END RTOS_TIMERS */
-
-	/* USER CODE BEGIN RTOS_QUEUES */
-	/* add queues, ... */
-	/* USER CODE END RTOS_QUEUES */
-
-	/* Create the thread(s) */
-	/* creation of defaultTask */
-	/* USER CODE BEGIN RTOS_THREADS */
-	/* add threads, ... */
-
-	/* creation of myTask02 */
 	tid_send = osThreadNew(Task_Send, NULL, &TaskSend_attributes);
-
-	/* creation of myTask03 */
-	// tid_data = osThreadNew(Task_Data, NULL, &TaskData_attributes);
-	/* USER CODE END RTOS_THREADS */
 
 	/* USER CODE BEGIN RTOS_EVENTS */
 	/* add events, ... */
@@ -713,34 +648,22 @@ void ACC_InitGPIO(void) {
 void Task_Send(void *argument) {
 	/* Infinite loop */
 	MX_USB_DEVICE_Init();
-	report.buttonMask = 0;
-	report.dx = 0;
-	report.dy = 0;
-	report.padding = 0;
-	for (int8_t i = -127; i < 0; i++) {
-		for (int8_t j = -127; j < 0; j++) {
-			uint32_t deadline = osKernelGetTickCount() + osKernelGetTickFreq() / freq;
-			report.dx = i;
-			report.dy = j;
-			osDelayUntil(deadline);
-			USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
-			deadline = osKernelGetTickCount() + osKernelGetTickFreq() / freq;
-			report.dx = -i;
-			report.dy = -j;
-			osDelayUntil(deadline);
-			USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
-		}
-	}
-}
-void Task_Data(void *argument) {
-	/* Infinite loop */
-	for (uint8_t i = -127; i < 0; i++) {
-		for (uint8_t j = -127; j < 0; j++) {}
-	}
-}
+	report = (report_t) {
+		.buttonMask = 0,
+		.dx = 0,
+		.dy = 0,
+		.padding = 0,
+	};
 
-/* Timer_CallBack function */
-void Timer_CallBack(void *argument) {
+	for (;;) {
+		uint32_t deadline = osKernelGetTickCount() + osKernelGetTickFreq() / freq;
+		BSP_ACCELERO_AccGetXYZ(pDataXYZ);
+		// RNN
+		report.dx = pDataXYZ[0];
+		report.dy = pDataXYZ[1];
+		USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
+		osDelayUntil(deadline);
+	}
 }
 
 /* USER CODE END 4 */

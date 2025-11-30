@@ -34,6 +34,7 @@
 /* Private macro -------------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+extern USBD_HandleTypeDef hUsbDeviceFS;
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE END PV */
@@ -822,10 +823,22 @@ uint32_t USBD_LL_GetRxDataSize(USBD_HandleTypeDef *pdev, uint8_t ep_addr)
    */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-  if (GPIO_Pin == GPIO_PIN_9)
-  {
-     HAL_PCDEx_BCD_VBUSDetect(&hpcd_USB_OTG_FS);
-  }
+  static GPIO_PinState lastEdge = GPIO_PIN_SET;
+	switch (GPIO_Pin) {
+    case GPIO_PIN_9:
+      HAL_PCDEx_BCD_VBUSDetect(&hpcd_USB_OTG_FS);
+      break;
+		case BUTTON_EXTI13_Pin:
+			GPIO_PinState rising = HAL_GPIO_ReadPin(BUTTON_EXTI13_GPIO_Port, GPIO_Pin);
+			signed char report[4] = {1, 0, 0, 0};
+			if (rising == GPIO_PIN_SET && lastEdge == GPIO_PIN_RESET) {
+				USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
+			}
+			lastEdge = rising;
+			break;
+		default:
+			break;
+	}
 }
 
 /**
