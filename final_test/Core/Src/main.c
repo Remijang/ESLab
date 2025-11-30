@@ -25,11 +25,17 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stdio.h"
+#include "usbd_hid.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+typedef struct {
+	char buttonMask;
+	signed char dx;
+	signed char dy;
+	char padding;
+} report_t;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -54,26 +60,6 @@ TIM_HandleTypeDef htim16;
 UART_HandleTypeDef huart3;
 
 /* Definitions for defaultTask */
-osThreadId_t defaultTaskHandle;
-const osThreadAttr_t defaultTask_attributes = {
-	.name = "defaultTask",
-	.stack_size = 128 * 4,
-	.priority = (osPriority_t)osPriorityNormal,
-};
-/* Definitions for myTask02 */
-osThreadId_t myTask02Handle;
-const osThreadAttr_t myTask02_attributes = {
-	.name = "myTask02",
-	.stack_size = 128 * 4,
-	.priority = (osPriority_t)osPriorityLow,
-};
-/* Definitions for myTask03 */
-osThreadId_t myTask03Handle;
-const osThreadAttr_t myTask03_attributes = {
-	.name = "myTask03",
-	.stack_size = 128 * 4,
-	.priority = (osPriority_t)osPriorityLow,
-};
 /* Definitions for myTimer01 */
 osTimerId_t myTimer01Handle;
 const osTimerAttr_t myTimer01_attributes = {.name = "myTimer01"};
@@ -84,8 +70,22 @@ const osMutexAttr_t myMutex01_attributes = {.name = "myMutex01"};
 osMutexId_t myMutex02Handle;
 const osMutexAttr_t myMutex02_attributes = {.name = "myMutex02"};
 /* USER CODE BEGIN PV */
+osThreadId_t tid_send;
+const osThreadAttr_t TaskSend_attributes = {
+	.name = "TaskSend",
+	.stack_size = 256 * 4,
+	.priority = (osPriority_t)osPriorityLow,
+};
+osThreadId_t tid_data;
+const osThreadAttr_t TaskData_attributes = {
+	.name = "TaskData",
+	.stack_size = 256 * 4,
+	.priority = (osPriority_t)osPriorityLow,
+};
 int16_t pDataXYZ[3];
-extern UART_HandleTypeDef hcom_uart[COMn];
+report_t report;
+uint32_t freq = 100;
+extern USBD_HandleTypeDef hUsbDeviceFS;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -95,19 +95,16 @@ static void MX_I2C2_Init(void);
 static void MX_QUADSPI_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_TIM16_Init(void);
-static void MX_SPI3_Init(void);
-void StartDefaultTask(void *argument);
-void StartTask02(void *argument);
-void StartTask03(void *argument);
 void Callback01(void *argument);
 
 /* USER CODE BEGIN PFP */
 void ACC_InitGPIO(void);
+void Task_Send(void *argument);
+void Task_Data(void *argument);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
 /* USER CODE END 0 */
 
 /**
@@ -142,7 +139,6 @@ int main(void) {
 	MX_USART3_UART_Init();
 	BSP_COM_Init(COM1);
 	MX_TIM16_Init();
-	//	MX_SPI3_Init();
 	/* USER CODE BEGIN 2 */
 	BSP_ACCELERO_Init();
 	ACC_InitGPIO();
@@ -190,16 +186,14 @@ int main(void) {
 
 	/* Create the thread(s) */
 	/* creation of defaultTask */
-	defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
-
-	/* creation of myTask02 */
-	// myTask02Handle = osThreadNew(StartTask02, NULL, &myTask02_attributes);
-
-	/* creation of myTask03 */
-	// myTask03Handle = osThreadNew(StartTask03, NULL, &myTask03_attributes);
-
 	/* USER CODE BEGIN RTOS_THREADS */
 	/* add threads, ... */
+
+	/* creation of myTask02 */
+	tid_send = osThreadNew(Task_Send, NULL, &TaskSend_attributes);
+
+	/* creation of myTask03 */
+	// tid_data = osThreadNew(Task_Data, NULL, &TaskData_attributes);
 	/* USER CODE END RTOS_THREADS */
 
 	/* USER CODE BEGIN RTOS_EVENTS */
@@ -346,42 +340,6 @@ static void MX_QUADSPI_Init(void) {
 	/* USER CODE BEGIN QUADSPI_Init 2 */
 
 	/* USER CODE END QUADSPI_Init 2 */
-}
-
-/**
- * @brief SPI3 Initialization Function
- * @param None
- * @retval None
- */
-static void MX_SPI3_Init(void) {
-	/* USER CODE BEGIN SPI3_Init 0 */
-
-	/* USER CODE END SPI3_Init 0 */
-
-	/* USER CODE BEGIN SPI3_Init 1 */
-
-	/* USER CODE END SPI3_Init 1 */
-	/* SPI3 parameter configuration*/
-	hspi3.Instance = SPI3;
-	hspi3.Init.Mode = SPI_MODE_MASTER;
-	hspi3.Init.Direction = SPI_DIRECTION_2LINES;
-	hspi3.Init.DataSize = SPI_DATASIZE_8BIT;
-	hspi3.Init.CLKPolarity = SPI_POLARITY_LOW;
-	hspi3.Init.CLKPhase = SPI_PHASE_1EDGE;
-	hspi3.Init.NSS = SPI_NSS_SOFT;
-	hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
-	hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
-	hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
-	hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-	hspi3.Init.CRCPolynomial = 7;
-	hspi3.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
-	hspi3.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
-	if (HAL_SPI_Init(&hspi3) != HAL_OK) {
-		Error_Handler();
-	}
-	/* USER CODE BEGIN SPI3_Init 2 */
-
-	/* USER CODE END SPI3_Init 2 */
 }
 
 /**
@@ -670,59 +628,35 @@ void ACC_InitGPIO(void) {
 	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
-/* USER CODE END 4 */
-
-/* USER CODE BEGIN Header_StartDefaultTask */
-/**
- * @brief  Function implementing the defaultTask thread.
- * @param  argument: Not used
- * @retval None
- */
-/* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void *argument) {
-	/* init code for USB_DEVICE */
+void Task_Send(void *argument) {
+	/* Infinite loop */
 	MX_USB_DEVICE_Init();
-	/* USER CODE BEGIN 5 */
-	/* Infinite loop */
-	for (;;) {
-		osDelay(10);
-		BSP_ACCELERO_AccGetXYZ(pDataXYZ);
-		printf("%d\n", pDataXYZ[0]);
+	report.buttonMask = 0;
+	report.dx = 0;
+	report.dy = 0;
+	report.padding = 0;
+	for (int8_t i = -127; i < 0; i++) {
+		for (int8_t j = -127; j < 0; j++) {
+			uint32_t deadline = osKernelGetTickCount() + osKernelGetTickFreq() / freq;
+			report.dx = i;
+			report.dy = j;
+			osDelayUntil(deadline);
+			USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
+			deadline = osKernelGetTickCount() + osKernelGetTickFreq() / freq;
+			report.dx = -i;
+			report.dy = -j;
+			osDelayUntil(deadline);
+			USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
+		}
 	}
-	/* USER CODE END 5 */
 }
-
-/* USER CODE BEGIN Header_StartTask02 */
-/**
- * @brief Function implementing the myTask02 thread.
- * @param argument: Not used
- * @retval None
- */
-/* USER CODE END Header_StartTask02 */
-void StartTask02(void *argument) {
-	/* USER CODE BEGIN StartTask02 */
+void Task_Data(void *argument) {
 	/* Infinite loop */
-	for (;;) {
-		osDelay(1);
+	for (uint8_t i = -127; i < 0; i++) {
+		for (uint8_t j = -127; j < 0; j++) {}
 	}
-	/* USER CODE END StartTask02 */
 }
-
-/* USER CODE BEGIN Header_StartTask03 */
-/**
- * @brief Function implementing the myTask03 thread.
- * @param argument: Not used
- * @retval None
- */
-/* USER CODE END Header_StartTask03 */
-void StartTask03(void *argument) {
-	/* USER CODE BEGIN StartTask03 */
-	/* Infinite loop */
-	for (;;) {
-		osDelay(1);
-	}
-	/* USER CODE END StartTask03 */
-}
+/* USER CODE END 4 */
 
 /* Callback01 function */
 void Callback01(void *argument) {
