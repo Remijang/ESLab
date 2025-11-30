@@ -486,7 +486,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : BUTTON_EXTI13_Pin */
   GPIO_InitStruct.Pin = BUTTON_EXTI13_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(BUTTON_EXTI13_GPIO_Port, &GPIO_InitStruct);
 
@@ -642,6 +642,7 @@ void ACC_InitGPIO(void) {
 void Task_Send(void *argument) {
 	/* Infinite loop */
 	MX_USB_DEVICE_Init();
+	// BSP_PB_Init(BUTTON_USER, BUTTON_MODE_EXTI);
 	report = (report_t) {
 		.buttonMask = 0,
 		.dx = 0,
@@ -653,8 +654,8 @@ void Task_Send(void *argument) {
 		uint32_t deadline = osKernelGetTickCount() + osKernelGetTickFreq() / freq;
 		BSP_ACCELERO_AccGetXYZ(pDataXYZ);
 		// RNN
-		report.dx = (char) (pDataXYZ[0] & 255);
-		report.dy = (char) (pDataXYZ[1] & 255);
+		// report.dx = (char) (pDataXYZ[0] & 255);
+		// report.dy = (char) (pDataXYZ[1] & 255);
 		USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
 		osDelayUntil(deadline);
 	}
