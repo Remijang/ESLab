@@ -831,9 +831,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		case BUTTON_EXTI13_Pin:
 			GPIO_PinState rising = HAL_GPIO_ReadPin(BUTTON_EXTI13_GPIO_Port, GPIO_Pin);
 			if (rising == GPIO_PIN_SET && lastEdge == GPIO_PIN_RESET) {
-        report.buttonMask |= 1;
+		        report.buttonMask &= 0;
 			} else if (rising == GPIO_PIN_RESET && lastEdge == GPIO_PIN_SET) {
-        report.buttonMask &= 0;
+		        report.buttonMask |= 1;
       }
 			lastEdge = rising;
 			break;
