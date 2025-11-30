@@ -27,16 +27,11 @@ extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "b_l475e_iot01a1.h"
-#include "hci_tl_interface.h"
 #include "stm32l4xx_hal.h"
-#include "stm32l475xx.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stm32l475e_iot01_accelero.h"
-#include "usbd_core.h"
-#include "usbd_desc.h"
-#include "usbd_hid.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -169,14 +164,8 @@ void Error_Handler(void);
 #define LED3_WIFI__LED4_BLE_GPIO_Port GPIOC
 #define SPBTLE_RF_RST_Pin GPIO_PIN_8
 #define SPBTLE_RF_RST_GPIO_Port GPIOA
-#define USB_OTG_FS_VBUS_Pin GPIO_PIN_9
-#define USB_OTG_FS_VBUS_GPIO_Port GPIOA
 #define USB_OTG_FS_ID_Pin GPIO_PIN_10
 #define USB_OTG_FS_ID_GPIO_Port GPIOA
-#define USB_OTG_FS_DM_Pin GPIO_PIN_11
-#define USB_OTG_FS_DM_GPIO_Port GPIOA
-#define USB_OTG_FS_DP_Pin GPIO_PIN_12
-#define USB_OTG_FS_DP_GPIO_Port GPIOA
 #define SYS_JTMS_SWDIO_Pin GPIO_PIN_13
 #define SYS_JTMS_SWDIO_GPIO_Port GPIOA
 #define SYS_JTCK_SWCLK_Pin GPIO_PIN_14
@@ -225,6 +214,7 @@ void Error_Handler(void);
 #define ISM43362_DRDY_EXTI1_GPIO_Port GPIOE
 
 /* USER CODE BEGIN Private defines */
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

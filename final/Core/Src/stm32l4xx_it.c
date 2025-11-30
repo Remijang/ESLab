@@ -1,28 +1,26 @@
 /* USER CODE BEGIN Header */
 /**
- ******************************************************************************
- * @file    stm32l4xx_it.c
- * @brief   Interrupt Service Routines.
- ******************************************************************************
- * @attention
- *
- * Copyright (c) 2025 STMicroelectronics.
- * All rights reserved.
- *
- * This software is licensed under terms that can be found in the LICENSE file
- * in the root directory of this software component.
- * If no LICENSE file comes with this software, it is provided AS-IS.
- *
- ******************************************************************************
- */
+  ******************************************************************************
+  * @file    stm32l4xx_it.c
+  * @brief   Interrupt Service Routines.
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2025 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
+  */
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm32l4xx_it.h"
-
-#include "FreeRTOS.h"
 #include "main.h"
-#include "stdio.h"
+#include "stm32l4xx_it.h"
+#include "FreeRTOS.h"
 #include "task.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -35,7 +33,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define CURSOR_STEP 5
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -45,14 +43,12 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
-uint8_t HID_Buffer[4];
-extern PCD_HandleTypeDef hpcd;
-extern USBD_HandleTypeDef USBD_Device;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN PFP */
-static void GetPointerData(uint8_t *pbuf);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -61,7 +57,7 @@ static void GetPointerData(uint8_t *pbuf);
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
-// extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
+extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
 /* USER CODE BEGIN EV */
 
 /* USER CODE END EV */
@@ -70,110 +66,113 @@ static void GetPointerData(uint8_t *pbuf);
 /*           Cortex-M4 Processor Interruption and Exception Handlers          */
 /******************************************************************************/
 /**
- * @brief This function handles Non maskable interrupt.
- */
-void NMI_Handler(void) {
-	/* USER CODE BEGIN NonMaskableInt_IRQn 0 */
+  * @brief This function handles Non maskable interrupt.
+  */
+void NMI_Handler(void)
+{
+  /* USER CODE BEGIN NonMaskableInt_IRQn 0 */
 
-	/* USER CODE END NonMaskableInt_IRQn 0 */
-	/* USER CODE BEGIN NonMaskableInt_IRQn 1 */
-	while (1) {}
-	/* USER CODE END NonMaskableInt_IRQn 1 */
+  /* USER CODE END NonMaskableInt_IRQn 0 */
+  /* USER CODE BEGIN NonMaskableInt_IRQn 1 */
+   while (1)
+  {
+  }
+  /* USER CODE END NonMaskableInt_IRQn 1 */
 }
 
 /**
- * @brief This function handles Hard fault interrupt.
- */
-void HardFault_Handler(void) {
-	/* USER CODE BEGIN HardFault_IRQn 0 */
+  * @brief This function handles Hard fault interrupt.
+  */
+void HardFault_Handler(void)
+{
+  /* USER CODE BEGIN HardFault_IRQn 0 */
 
-	/* USER CODE END HardFault_IRQn 0 */
-	while (1) {
-		/* USER CODE BEGIN W1_HardFault_IRQn 0 */
-		/* USER CODE END W1_HardFault_IRQn 0 */
-	}
+  /* USER CODE END HardFault_IRQn 0 */
+  while (1)
+  {
+    /* USER CODE BEGIN W1_HardFault_IRQn 0 */
+    /* USER CODE END W1_HardFault_IRQn 0 */
+  }
 }
 
 /**
- * @brief This function handles Memory management fault.
- */
-void MemManage_Handler(void) {
-	/* USER CODE BEGIN MemoryManagement_IRQn 0 */
+  * @brief This function handles Memory management fault.
+  */
+void MemManage_Handler(void)
+{
+  /* USER CODE BEGIN MemoryManagement_IRQn 0 */
 
-	/* USER CODE END MemoryManagement_IRQn 0 */
-	while (1) {
-		/* USER CODE BEGIN W1_MemoryManagement_IRQn 0 */
-		/* USER CODE END W1_MemoryManagement_IRQn 0 */
-	}
+  /* USER CODE END MemoryManagement_IRQn 0 */
+  while (1)
+  {
+    /* USER CODE BEGIN W1_MemoryManagement_IRQn 0 */
+    /* USER CODE END W1_MemoryManagement_IRQn 0 */
+  }
 }
 
 /**
- * @brief This function handles Prefetch fault, memory access fault.
- */
-void BusFault_Handler(void) {
-	/* USER CODE BEGIN BusFault_IRQn 0 */
+  * @brief This function handles Prefetch fault, memory access fault.
+  */
+void BusFault_Handler(void)
+{
+  /* USER CODE BEGIN BusFault_IRQn 0 */
 
-	/* USER CODE END BusFault_IRQn 0 */
-	while (1) {
-		/* USER CODE BEGIN W1_BusFault_IRQn 0 */
-		/* USER CODE END W1_BusFault_IRQn 0 */
-	}
+  /* USER CODE END BusFault_IRQn 0 */
+  while (1)
+  {
+    /* USER CODE BEGIN W1_BusFault_IRQn 0 */
+    /* USER CODE END W1_BusFault_IRQn 0 */
+  }
 }
 
 /**
- * @brief This function handles Undefined instruction or illegal state.
- */
-void UsageFault_Handler(void) {
-	/* USER CODE BEGIN UsageFault_IRQn 0 */
+  * @brief This function handles Undefined instruction or illegal state.
+  */
+void UsageFault_Handler(void)
+{
+  /* USER CODE BEGIN UsageFault_IRQn 0 */
 
-	/* USER CODE END UsageFault_IRQn 0 */
-	while (1) {
-		/* USER CODE BEGIN W1_UsageFault_IRQn 0 */
-		/* USER CODE END W1_UsageFault_IRQn 0 */
-	}
+  /* USER CODE END UsageFault_IRQn 0 */
+  while (1)
+  {
+    /* USER CODE BEGIN W1_UsageFault_IRQn 0 */
+    /* USER CODE END W1_UsageFault_IRQn 0 */
+  }
 }
 
 /**
- * @brief This function handles Debug monitor.
- */
-void DebugMon_Handler(void) {
-	/* USER CODE BEGIN DebugMonitor_IRQn 0 */
+  * @brief This function handles Debug monitor.
+  */
+void DebugMon_Handler(void)
+{
+  /* USER CODE BEGIN DebugMonitor_IRQn 0 */
 
-	/* USER CODE END DebugMonitor_IRQn 0 */
-	/* USER CODE BEGIN DebugMonitor_IRQn 1 */
+  /* USER CODE END DebugMonitor_IRQn 0 */
+  /* USER CODE BEGIN DebugMonitor_IRQn 1 */
 
-	/* USER CODE END DebugMonitor_IRQn 1 */
+  /* USER CODE END DebugMonitor_IRQn 1 */
 }
 
 /**
- * @brief This function handles System tick timer.
- */
-void SysTick_Handler(void) {
-	/* USER CODE BEGIN SysTick_IRQn 0 */
+  * @brief This function handles System tick timer.
+  */
+void SysTick_Handler(void)
+{
+  /* USER CODE BEGIN SysTick_IRQn 0 */
 
-	/* USER CODE END SysTick_IRQn 0 */
-	HAL_IncTick();
-#if (INCLUDE_xTaskGetSchedulerState == 1)
-	if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) {
+  /* USER CODE END SysTick_IRQn 0 */
+  HAL_IncTick();
+#if (INCLUDE_xTaskGetSchedulerState == 1 )
+  if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED)
+  {
 #endif /* INCLUDE_xTaskGetSchedulerState */
-		xPortSysTickHandler();
-#if (INCLUDE_xTaskGetSchedulerState == 1)
-	}
+  xPortSysTickHandler();
+#if (INCLUDE_xTaskGetSchedulerState == 1 )
+  }
 #endif /* INCLUDE_xTaskGetSchedulerState */
-	/* USER CODE BEGIN SysTick_IRQn 1 */
-	// static __IO uint32_t counter = 0;
+  /* USER CODE BEGIN SysTick_IRQn 1 */
 
-	// /* check Joystick state every polling interval (10ms) */
-	// if (counter++ == USBD_HID_GetPollingInterval(&USBD_Device)) {
-	// 	GetPointerData(HID_Buffer);
-
-	// 	/* send data though IN endpoint*/
-	// 	if ((HID_Buffer[1] != 0) || (HID_Buffer[2] != 0)) {
-	// 		USBD_HID_SendReport(&USBD_Device, HID_Buffer, 4);
-	// 	}
-	// 	counter = 0;
-	// }
-	/* USER CODE END SysTick_IRQn 1 */
+  /* USER CODE END SysTick_IRQn 1 */
 }
 
 /******************************************************************************/
@@ -184,75 +183,53 @@ void SysTick_Handler(void) {
 /******************************************************************************/
 
 /**
- * @brief This function handles EXTI line[9:5] interrupts.
- */
-void EXTI9_5_IRQHandler(void) {
-	/* USER CODE BEGIN EXTI9_5_IRQn 0 */
-
-	/* USER CODE END EXTI9_5_IRQn 0 */
-	HAL_GPIO_EXTI_IRQHandler(SPSGRF_915_GPIO3_EXTI5_Pin);
-	HAL_EXTI_IRQHandler(&H_EXTI_6);
-	HAL_GPIO_EXTI_IRQHandler(VL53L0X_GPIO1_EXTI7_Pin);
-	HAL_GPIO_EXTI_IRQHandler(LSM3MDL_DRDY_EXTI8_Pin);
-	/* USER CODE BEGIN EXTI9_5_IRQn 1 */
-
-	/* USER CODE END EXTI9_5_IRQn 1 */
-}
-
-/**
- * @brief This function handles EXTI line[15:10] interrupts.
- */
-void EXTI15_10_IRQHandler(void) {
-	/* USER CODE BEGIN EXTI15_10_IRQn 0 */
-
-	/* USER CODE END EXTI15_10_IRQn 0 */
-	HAL_GPIO_EXTI_IRQHandler(LPS22HB_INT_DRDY_EXTI0_Pin);
-	HAL_GPIO_EXTI_IRQHandler(LSM6DSL_INT1_EXTI11_Pin);
-	HAL_EXTI_IRQHandler(&H_EXTI_13);
-	HAL_GPIO_EXTI_IRQHandler(ARD_D2_Pin);
-	HAL_GPIO_EXTI_IRQHandler(HTS221_DRDY_EXTI15_Pin);
-	/* USER CODE BEGIN EXTI15_10_IRQn 1 */
-
-	/* USER CODE END EXTI15_10_IRQn 1 */
-}
-
-/**
- * @brief This function handles USB OTG FS global interrupt.
- */
-void OTG_FS_IRQHandler(void) {
-	/* USER CODE BEGIN OTG_FS_IRQn 0 */
-
-	/* USER CODE END OTG_FS_IRQn 0 */
-	HAL_PCD_IRQHandler(&hpcd);
-	/* USER CODE BEGIN OTG_FS_IRQn 1 */
-
-	/* USER CODE END OTG_FS_IRQn 1 */
-}
-
-static void GetPointerData(uint8_t *pbuf) {
-	static int8_t cnt = 0;
-	int8_t x = 0, y = 0;
-
-	if (cnt++ > 0) {
-		x = CURSOR_STEP;
-	} else {
-		x = -CURSOR_STEP;
-	}
-
-	pbuf[0] = 0;
-	pbuf[1] = x;
-	pbuf[2] = y;
-	pbuf[3] = 0;
-}
-
-/**
- * @brief  This function handles PPP interrupt request.
- * @param  None
- * @retval None
- */
-/*void PPP_IRQHandler(void)
+  * @brief This function handles EXTI line[9:5] interrupts.
+  */
+void EXTI9_5_IRQHandler(void)
 {
-}*/
+  /* USER CODE BEGIN EXTI9_5_IRQn 0 */
+
+  /* USER CODE END EXTI9_5_IRQn 0 */
+  HAL_GPIO_EXTI_IRQHandler(SPSGRF_915_GPIO3_EXTI5_Pin);
+  HAL_GPIO_EXTI_IRQHandler(SPBTLE_RF_IRQ_EXTI6_Pin);
+  HAL_GPIO_EXTI_IRQHandler(VL53L0X_GPIO1_EXTI7_Pin);
+  HAL_GPIO_EXTI_IRQHandler(LSM3MDL_DRDY_EXTI8_Pin);
+  /* USER CODE BEGIN EXTI9_5_IRQn 1 */
+
+  /* USER CODE END EXTI9_5_IRQn 1 */
+}
+
+/**
+  * @brief This function handles EXTI line[15:10] interrupts.
+  */
+void EXTI15_10_IRQHandler(void)
+{
+  /* USER CODE BEGIN EXTI15_10_IRQn 0 */
+
+  /* USER CODE END EXTI15_10_IRQn 0 */
+  HAL_GPIO_EXTI_IRQHandler(LPS22HB_INT_DRDY_EXTI0_Pin);
+  HAL_GPIO_EXTI_IRQHandler(LSM6DSL_INT1_EXTI11_Pin);
+  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_13);
+  HAL_GPIO_EXTI_IRQHandler(ARD_D2_Pin);
+  HAL_GPIO_EXTI_IRQHandler(HTS221_DRDY_EXTI15_Pin);
+  /* USER CODE BEGIN EXTI15_10_IRQn 1 */
+
+  /* USER CODE END EXTI15_10_IRQn 1 */
+}
+
+/**
+  * @brief This function handles USB OTG FS global interrupt.
+  */
+void OTG_FS_IRQHandler(void)
+{
+  /* USER CODE BEGIN OTG_FS_IRQn 0 */
+
+  /* USER CODE END OTG_FS_IRQn 0 */
+  HAL_PCD_IRQHandler(&hpcd_USB_OTG_FS);
+  /* USER CODE BEGIN OTG_FS_IRQn 1 */
+
+  /* USER CODE END OTG_FS_IRQn 1 */
+}
 
 /* USER CODE BEGIN 1 */
 

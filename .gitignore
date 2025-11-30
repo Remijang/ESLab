@@ -6,3 +6,5 @@ lab2/**/.git*/
 **/env.h
 **/.metadata/
 **/HID_Standalone/
+**/final-test/
+**/uart-test/
