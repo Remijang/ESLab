@@ -36,7 +36,12 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-
+typedef struct {
+	char buttonMask;
+	signed char dx;
+	signed char dy;
+	char padding;
+} report_t;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/

@@ -30,12 +30,6 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-typedef struct {
-	char buttonMask;
-	signed char dx;
-	signed char dy;
-	char padding;
-} report_t;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -659,8 +653,8 @@ void Task_Send(void *argument) {
 		uint32_t deadline = osKernelGetTickCount() + osKernelGetTickFreq() / freq;
 		BSP_ACCELERO_AccGetXYZ(pDataXYZ);
 		// RNN
-		report.dx = pDataXYZ[0];
-		report.dy = pDataXYZ[1];
+		report.dx = (char) (pDataXYZ[0] & 255);
+		report.dy = (char) (pDataXYZ[1] & 255);
 		USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
 		osDelayUntil(deadline);
 	}

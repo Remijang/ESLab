@@ -34,7 +34,7 @@
 /* Private macro -------------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-extern USBD_HandleTypeDef hUsbDeviceFS;
+extern report_t report;
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE END PV */
@@ -830,10 +830,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
       break;
 		case BUTTON_EXTI13_Pin:
 			GPIO_PinState rising = HAL_GPIO_ReadPin(BUTTON_EXTI13_GPIO_Port, GPIO_Pin);
-			signed char report[4] = {1, 0, 0, 0};
 			if (rising == GPIO_PIN_SET && lastEdge == GPIO_PIN_RESET) {
-				USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
-			}
+        report.buttonMask |= 1;
+			} else if (rising == GPIO_PIN_RESET && lastEdge == GPIO_PIN_SET) {
+        report.buttonMask &= 0;
+      }
 			lastEdge = rising;
 			break;
 		default:
