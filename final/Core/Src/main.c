@@ -36,7 +36,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define timerDelay 300U
-#define NUM_SAMPLE 9
+#define NUM_SAMPLE 18
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -64,7 +64,7 @@ const osThreadAttr_t TaskSend_attributes = {
 };
 int16_t pDataXYZ[3];
 report_t report;
-uint32_t freq = 1;
+uint32_t freq = 100;
 extern USBD_HandleTypeDef hUsbDeviceFS;
 
 float32_t DtD_data[36];
@@ -73,13 +73,32 @@ float32_t Dt1_data[6];
 arm_matrix_instance_f32 DtD;
 arm_matrix_instance_f32 Dt1;
 
-float32_t DtD_inv_data[6];
+float32_t DtD_inv_data[36];
 arm_matrix_instance_f32 DtD_inv;
 
 float32_t v_data[6];
 arm_matrix_instance_f32 v;
 
-float32_t sample_data[NUM_SAMPLE][3];
+float32_t sample_data[NUM_SAMPLE][3] = {
+  {-13, 14, 1010},
+  {-1009, -14, 9},
+  {985, -21, 64},
+  {-272, -273, 937},
+  {814, -302, 502},
+  {-51, -20, -996},
+  {-317, 174, -932},
+  {-352, -41, 944},
+  {4, 354, 937},
+  {-5, -555, 855},
+  {-7, -803, 634},
+  {-8, 607, 787},
+  {682, -22, 737},
+  {-520, -60, 861},
+  {-578, -57, -825},
+  {357, -36, 918},
+  {70, -451, -890},
+  {-6, 468, -872},
+};
 
 typedef struct {
     float offset[3];
@@ -735,7 +754,13 @@ void Calibration() {
 
 void Task_Send(void *argument) {
 	MX_USB_DEVICE_Init();
-  // Calibration();
+  Calibration();
+
+  /*
+  printf("\n");
+  printf("%f, %f, %f\n", cal_data.offset[0], cal_data.offset[1], cal_data.offset[2]);
+  printf("%f, %f, %f\n\n", cal_data.gain[0], cal_data.gain[1], cal_data.gain[2]);
+  */
 
 	report = (report_t) {
 		.buttonMask = 0,
@@ -744,11 +769,44 @@ void Task_Send(void *argument) {
 		.padding = 0,
 	};
 
+  float x = 0.0, y = 0.0;
+  float vx = 0.0, vy = 0.0;
+  float alpha = 0.95;
+  float g = 9.81;
+  float c = (1.0 + alpha) / 2;
+
+  int count = 0;
+
 	for (;;) {
-		uint32_t deadline = osKernelGetTickCount() + osKernelGetTickFreq() / freq;
+		// calculate current time interval
+    uint32_t deadline = osKernelGetTickCount() + osKernelGetTickFreq() / freq;
+
+    // sample accelerometer data
 		BSP_ACCELERO_AccGetXYZ(pDataXYZ);
-		// RNN
-		printf("%f, %f, %f\n", (float) pDataXYZ[0], (float) pDataXYZ[1], (float) pDataXYZ[2]);
+
+    // calibration
+    float data[3] = {pDataXYZ[0], pDataXYZ[1], pDataXYZ[2]};
+    for (int i = 0; i < 3; ++i) {
+      data[i] += cal_data.offset[i];
+      data[i] *= cal_data.gain[i];
+      data[i] = (float) ((int) (data[i] * 100)) / 100;
+    }
+    /*
+		printf("before: (%d, %d, %d), after: (%f, %f, %f)\n", 
+      pDataXYZ[0], pDataXYZ[1], pDataXYZ[2],
+      data[0], data[1], data[2]);
+    */
+   
+    // dead reckoning
+    float ax = -1.0 * data[1], ay = 1.0 * data[0];
+    vx = alpha * vx + c * ax * g / freq;
+    vy = alpha * vy + c * ay * g / freq;
+    // simulation
+    x += vx / freq;
+    y += vy / freq;
+    if (count++ % 10 == 0)
+    	// m -> cm
+      printf("%f\t %f\t %f\t %f\t\n", vx * 100, vy * 100, x * 100, y * 100);
 		// report.dx = (char) (pDataXYZ[0] & 255);
 		// report.dy = (char) (pDataXYZ[1] & 255);
 		USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
