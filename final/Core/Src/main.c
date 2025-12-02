@@ -26,6 +26,7 @@
 /* USER CODE BEGIN Includes */
 #include "stdio.h"
 #include "usbd_hid.h"
+#include "arm_math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -35,6 +36,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define timerDelay 300U
+#define NUM_SAMPLE 9
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -62,8 +64,29 @@ const osThreadAttr_t TaskSend_attributes = {
 };
 int16_t pDataXYZ[3];
 report_t report;
-uint32_t freq = 100;
+uint32_t freq = 1;
 extern USBD_HandleTypeDef hUsbDeviceFS;
+
+float32_t DtD_data[36];
+float32_t Dt1_data[6];
+
+arm_matrix_instance_f32 DtD;
+arm_matrix_instance_f32 Dt1;
+
+float32_t DtD_inv_data[6];
+arm_matrix_instance_f32 DtD_inv;
+
+float32_t v_data[6];
+arm_matrix_instance_f32 v;
+
+float32_t sample_data[NUM_SAMPLE][3];
+
+typedef struct {
+    float offset[3];
+    float gain[3];
+} SensorCal_t;
+
+SensorCal_t cal_data;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -639,10 +662,81 @@ void ACC_InitGPIO(void) {
 	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
+void Calibration_Init() {
+  arm_mat_init_f32(&DtD, 6, 6, DtD_data);
+  arm_mat_init_f32(&Dt1, 6, 1, Dt1_data);
+  arm_mat_init_f32(&DtD_inv, 6, 6, DtD_inv_data);
+  arm_mat_init_f32(&v, 6, 1, v_data);
+  memset(DtD_data, 0, sizeof(DtD_data));
+  memset(Dt1_data, 0, sizeof(Dt1_data));
+}
+
+void Add_Sample(int i) {
+  float x = sample_data[i][0];
+  float y = sample_data[i][1];
+  float z = sample_data[i][2];
+  float d[6];
+  d[0] = x * x;
+  d[1] = y * y;
+  d[2] = z * z;
+  d[3] = 2 * x;
+  d[4] = 2 * y;
+  d[5] = 2 * z;
+
+  int k = 0;
+  for (int i = 0; i < 6; i++) {
+    for (int j = 0; j < 6; j++) {
+      DtD_data[k] += d[i] * d[j];
+      ++k;
+    }
+    Dt1_data[i] += d[i];
+  }
+}
+
+int Calibration_Solve() {
+  arm_status st;
+  st = arm_mat_inverse_f32(&DtD, &DtD_inv);
+  if (st != ARM_MATH_SUCCESS)
+    return -1;
+  st = arm_mat_mult_f32(&DtD_inv, &Dt1, &v);
+  if (st != ARM_MATH_SUCCESS)
+    return -1;
+
+  float a = v_data[0];
+  float b = v_data[1];
+  float c = v_data[2];
+  float g = v_data[3];
+  float h = v_data[4];
+  float i = v_data[5];
+
+  cal_data.offset[0] = g / a;
+  cal_data.offset[1] = h / b;
+  cal_data.offset[2] = i / c;
+
+  float G = 1 + (g * g) / a + (h * h) / b + (i * i) / c;
+
+  arm_sqrt_f32(a / G, &cal_data.gain[0]);
+  arm_sqrt_f32(b / G, &cal_data.gain[1]);
+  arm_sqrt_f32(c / G, &cal_data.gain[2]);
+
+  return 0;
+}
+
+void Calibration() {
+  Calibration_Init();
+  for (int i = 0; i < NUM_SAMPLE; ++i) {
+    Add_Sample(i);
+  }
+  int ret = Calibration_Solve();
+  if (ret != 0) {
+    printf("Calibration error\n");
+  }
+}
+
 void Task_Send(void *argument) {
-	/* Infinite loop */
 	MX_USB_DEVICE_Init();
-	// BSP_PB_Init(BUTTON_USER, BUTTON_MODE_EXTI);
+  // Calibration();
+
 	report = (report_t) {
 		.buttonMask = 0,
 		.dx = 0,
@@ -654,6 +748,7 @@ void Task_Send(void *argument) {
 		uint32_t deadline = osKernelGetTickCount() + osKernelGetTickFreq() / freq;
 		BSP_ACCELERO_AccGetXYZ(pDataXYZ);
 		// RNN
+		printf("%f, %f, %f\n", (float) pDataXYZ[0], (float) pDataXYZ[1], (float) pDataXYZ[2]);
 		// report.dx = (char) (pDataXYZ[0] & 255);
 		// report.dy = (char) (pDataXYZ[1] & 255);
 		USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
