@@ -62,7 +62,7 @@ ACCELERO_StatusTypeDef BSP_ACCELERO_Init(void)
   
     /* MEMS configuration ------------------------------------------------------*/
     /* Fill the ACCELERO accelerometer structure */
-    LSM6DSL_InitStructure.AccOutput_DataRate = LSM6DSL_ODR_104Hz;
+    LSM6DSL_InitStructure.AccOutput_DataRate = LSM6DSL_ODR_833Hz;
     LSM6DSL_InitStructure.Axes_Enable = 0;
     LSM6DSL_InitStructure.AccFull_Scale = LSM6DSL_ACC_FULLSCALE_2G;
     LSM6DSL_InitStructure.BlockData_Update = LSM6DSL_BDU_BLOCK_UPDATE;
@@ -74,9 +74,6 @@ ACCELERO_StatusTypeDef BSP_ACCELERO_Init(void)
     
     /* Configure MEMS: BDU and Auto-increment for multi read/write */
     ctrl |= ((LSM6DSL_InitStructure.BlockData_Update | LSM6DSL_ACC_GYRO_IF_INC_ENABLED) << 8);
-
-    /* Configure the ACCELERO accelerometer main parameters */
-    AccelerometerDrv->Init(ctrl);
   }  
 
   return ret;

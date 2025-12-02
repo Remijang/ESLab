@@ -62,9 +62,12 @@ const osThreadAttr_t TaskSend_attributes = {
 	.stack_size = 256 * 4,
 	.priority = (osPriority_t)osPriorityLow,
 };
+
 int16_t pDataXYZ[3];
 report_t report;
-uint32_t freq = 100;
+uint32_t freq = 800;
+uint32_t update_freq = 100;
+
 extern USBD_HandleTypeDef hUsbDeviceFS;
 
 float32_t DtD_data[36];
@@ -103,6 +106,7 @@ float32_t sample_data[NUM_SAMPLE][3] = {
 typedef struct {
     float offset[3];
     float gain[3];
+    float post_offset[3];
 } SensorCal_t;
 
 SensorCal_t cal_data;
@@ -738,6 +742,11 @@ int Calibration_Solve() {
   arm_sqrt_f32(b / G, &cal_data.gain[1]);
   arm_sqrt_f32(c / G, &cal_data.gain[2]);
 
+  // to m / s^2
+  cal_data.gain[0] *= 9.81;
+  cal_data.gain[1] *= 9.81;
+  cal_data.gain[2] *= 9.81;
+
   return 0;
 }
 
@@ -769,13 +778,17 @@ void Task_Send(void *argument) {
 		.padding = 0,
 	};
 
-  float x = 0.0, y = 0.0;
   float vx = 0.0, vy = 0.0;
-  float alpha = 0.95;
-  float g = 9.81;
+  float alpha = 0.9;
   float c = (1.0 + alpha) / 2;
 
-  int count = 0;
+  int count = 1;
+
+  float sum[2] = {0.0};
+
+  float ax_sum = 0.0, ay_sum = 0.0;
+
+  float scale = c / freq / update_freq;
 
 	for (;;) {
 		// calculate current time interval
@@ -785,31 +798,41 @@ void Task_Send(void *argument) {
 		BSP_ACCELERO_AccGetXYZ(pDataXYZ);
 
     // calibration
-    float data[3] = {pDataXYZ[0], pDataXYZ[1], pDataXYZ[2]};
-    for (int i = 0; i < 3; ++i) {
+    float data[2] = {pDataXYZ[0], pDataXYZ[1]};
+    for (int i = 0; i < 2; ++i) {
       data[i] += cal_data.offset[i];
       data[i] *= cal_data.gain[i];
-      data[i] = (float) ((int) (data[i] * 100)) / 100;
+      sum[i] += data[i];
+      data[i] += cal_data.post_offset[i];
     }
-    /*
-		printf("before: (%d, %d, %d), after: (%f, %f, %f)\n", 
-      pDataXYZ[0], pDataXYZ[1], pDataXYZ[2],
-      data[0], data[1], data[2]);
-    */
-   
-    // dead reckoning
-    float ax = -1.0 * data[1], ay = 1.0 * data[0];
-    vx = alpha * vx + c * ax * g / freq;
-    vy = alpha * vy + c * ay * g / freq;
-    // simulation
-    x += vx / freq;
-    y += vy / freq;
-    if (count++ % 10 == 0)
-    	// m -> cm
-      printf("%f\t %f\t %f\t %f\t\n", vx * 100, vy * 100, x * 100, y * 100);
-		// report.dx = (char) (pDataXYZ[0] & 255);
-		// report.dy = (char) (pDataXYZ[1] & 255);
-		USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
+
+    if (count++ % freq == 0) {
+      float eval = sum[0] * sum[0] + sum[1] * sum[1];
+      if (eval < 3600.0) {
+        cal_data.post_offset[0] = -sum[0] / freq;
+        cal_data.post_offset[1] = -sum[1] / freq;
+      }
+      sum[0] = sum[1] = 0.0;
+    }
+    
+    ax_sum += -1.0 * data[1], ay_sum += 1.0 * data[0];
+
+    if (count % (freq / update_freq) == 0) {
+      ax_sum *= scale, ay_sum *= scale;
+      for (int i = 0; i < freq / update_freq; ++i) {
+        vx = alpha * vx + ax_sum;
+        vy = alpha * vy + ay_sum;
+      }
+      printf("%f\t %f\t %f\t %f\n", vx * 1000, vy * 1000, ax_sum, ay_sum);
+      
+      report.dx = (char) vx;
+      report.dy = (char) vy;
+      
+      USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
+
+      ax_sum = ay_sum = 0.0;
+    }
+
 		osDelayUntil(deadline);
 	}
 }
