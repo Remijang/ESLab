@@ -72,11 +72,10 @@ const osThreadAttr_t TaskData_attributes = {
 	.priority = (osPriority_t)osPriorityLow,
 };
 int16_t pDataXYZ[3];
-int16_t pData[200][3];
 int16_t count = 0;
 report_t report;
 uint32_t freq = 100;
-uint8_t start = 0, stop = 0;
+uint8_t start = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -604,37 +603,35 @@ void ACC_InitGPIO(void) {
 
 void Task_Send(void *argument) {
 	/* Infinite loop */
+	int count = 0;
 	for (;;) {
-		uint16_t deadline = osKernelGetTickCount() + osKernelGetTickFreq() / freq;
-		if (stop == 1) {
-			break;
+		printf("data %d\n", count);
+		while (start == 0)
+			;
+		while (start == 1) {
+			uint16_t deadline = osKernelGetTickCount() + osKernelGetTickFreq() / freq;
+
+			BSP_ACCELERO_AccGetXYZ(pDataXYZ);
+			printf("%d, %d, %d\n", pDataXYZ[0], pDataXYZ[1], pDataXYZ[2]);
+
+			osStatus_t ret = osDelayUntil(deadline);
+			if (ret != osOK) {
+				printf("error when waiting\n");
+				break;
+			}
 		}
-		if (count == 200) {
-			printf("error !\n");
-			break;
-		}
-		if (start == 1) {
-			BSP_ACCELERO_AccGetXYZ(pData[count]);
-			count++;
-		}
-		osStatus_t ret = osDelayUntil(deadline);
-		if (ret != osOK) {
-			printf("error when waiting\n");
-			break;
-		}
-	}
-	for (int i = 0; i < count; i++) {
-		printf("%d, %d, %d\n", pData[i][0], pData[i][1], pData[i][2]);
+		count++;
 	}
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	switch (GPIO_Pin) {
 		case BUTTON_EXTI13_Pin:
-			if (start == 0)
+			if (start == 0) {
 				start = 1;
-			else if (stop == 0)
-				stop = 1;
+			} else {
+				start = 0;
+			}
 			break;
 		default:
 			break;
