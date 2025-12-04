@@ -9,3 +9,4 @@ lab2/**/.git*/
 **/final_test/
 **/uart_test/
 **/STM32CubeL4/
+*/rnn_params.pth
