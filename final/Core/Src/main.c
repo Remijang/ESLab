@@ -37,6 +37,8 @@
 /* USER CODE BEGIN PD */
 #define timerDelay 300U
 #define NUM_SAMPLE 18
+
+#define ENABLE_RNN 0
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -761,6 +763,10 @@ void Calibration() {
   }
 }
 
+void rnn(float *vx, float *vy) {
+  return;
+}
+
 void Task_Send(void *argument) {
 	MX_USB_DEVICE_Init();
   Calibration();
@@ -779,16 +785,20 @@ void Task_Send(void *argument) {
 	};
 
   float vx = 0.0, vy = 0.0;
-  float alpha = 0.9;
-  float c = (1.0 + alpha) / 2;
 
-  int count = 1;
+  float x = 0.0, y = 0.0;
+
+  int count = 0;
 
   float sum[2] = {0.0};
 
   float ax_sum = 0.0, ay_sum = 0.0;
 
-  float scale = c / freq / update_freq;
+  float subsample = freq / update_freq;
+
+  float update_interval = 1.0f / update_freq;
+
+  float threshold = 3600.0f;
 
 	for (;;) {
 		// calculate current time interval
@@ -806,9 +816,10 @@ void Task_Send(void *argument) {
       data[i] += cal_data.post_offset[i];
     }
 
-    if (count++ % freq == 0) {
+    // reset post offset when it is stop
+    if (++count % freq == 0) {
       float eval = sum[0] * sum[0] + sum[1] * sum[1];
-      if (eval < 3600.0) {
+      if (eval < threshold) {
         cal_data.post_offset[0] = -sum[0] / freq;
         cal_data.post_offset[1] = -sum[1] / freq;
       }
@@ -817,16 +828,25 @@ void Task_Send(void *argument) {
     
     ax_sum += -1.0 * data[1], ay_sum += 1.0 * data[0];
 
-    if (count % (freq / update_freq) == 0) {
-      ax_sum *= scale, ay_sum *= scale;
-      for (int i = 0; i < freq / update_freq; ++i) {
-        vx = alpha * vx + ax_sum;
-        vy = alpha * vy + ay_sum;
-      }
-      printf("%f\t %f\t %f\t %f\n", vx * 1000, vy * 1000, ax_sum, ay_sum);
+    if (count % subsample == 0) {
+      ax_sum /= subsample;
+      ay_sum /= subsample;
       
-      report.dx = (char) vx;
-      report.dy = (char) vy;
+#if ENABLE_RNN == 0
+      vx += ax_sum * update_interval;
+      vy += ay_sum * update_interval;
+#else
+      rnn(&vx, &vy);
+#endif
+
+      x += vx * update_interval;
+      y += vy * update_interval;
+
+      // print velocity (cm), position (cm)
+      printf("%f\t %f\t %f\t %f\n", vx * 100, vy * 100, x * 100, y * 100);
+      
+      report.dx = (char) (vx * 100);
+      report.dy = (char) (vy * 100);
       
       USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
 
