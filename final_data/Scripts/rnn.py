@@ -37,8 +37,10 @@ class RNNDataset:
                     continue
 
                 nums = list(map(float, line.replace(" ", "").split(",")))
-                nums[0] = (nums[0] - D) / A
-                nums[1] = (nums[1] - E) / B
+                x = -(nums[1] - E) / B
+                y = (nums[0] - D) / A
+                nums[0] = x
+                nums[1] = y
                 nums = torch.tensor(nums).unsqueeze(dim=0)
                 result[count].append(nums)
         for i in range(count + 1):
@@ -110,6 +112,7 @@ def main(args):
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     N = len(dataset)
     pbar = tqdm(range(args.epochs))
+    loss_history = []
     for epoch in pbar:
         model.train()
         total_loss = 0.0
@@ -132,19 +135,21 @@ def main(args):
             loss.backward()
             optimizer.step()
 
-            total_loss += loss.item() * x.size(0)
+            total_loss += loss.item()
 
         avg_loss = total_loss / len(dataset)
         pbar.set_postfix({"loss": f"{avg_loss:.3f}"})
-    torch.save(model.state_dict(), args.save_path)
+        loss_history.append(avg_loss)
+        if avg_loss == min(loss_history):
+            torch.save(model.state_dict(), args.save_path)
     print(f"Saved model params to {args.save_path}")
 
 
 def parse():
     parser = argparse.ArgumentParser(description="Train SimpleRNN on custom dataset")
     parser.add_argument("--epochs", type=int, default=10000)
-    parser.add_argument("--hidden_size", type=int, default=50)
-    parser.add_argument("--lr", type=float, default=5e-4)
+    parser.add_argument("--hidden_size", type=int, default=15)
+    parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument(
         "--save_path",
         type=str,
