@@ -25,6 +25,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "arm_math.h"
+#include "rnn.h"
 #include "stdio.h"
 #include "usbd_hid.h"
 /* USER CODE END Includes */
@@ -62,13 +63,20 @@ const osThreadAttr_t TaskSend_attributes = {
 	.stack_size = 256 * 4,
 	.priority = (osPriority_t)osPriorityLow,
 };
+osThreadId_t tid_send_rnn;
+const osThreadAttr_t TaskSendRNN_attributes = {
+	.name = "TaskRNN",
+	.stack_size = 256 * 4,
+	.priority = (osPriority_t)osPriorityLow,
+};
 
 int16_t pDataXYZ[3];
 report_t report;
-uint32_t freq = 800;
+uint32_t freq = 100;
 uint32_t update_freq = 100;
 
 extern USBD_HandleTypeDef hUsbDeviceFS;
+extern const float rnn_alpha;
 
 float32_t DtD_data[36];
 float32_t Dt1_data[6];
@@ -111,6 +119,7 @@ void Timer_CallBack(void *argument);
 /* USER CODE BEGIN PFP */
 void ACC_InitGPIO(void);
 void Task_Send(void *argument);
+void Task_Send_RNN(void *argument);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -150,13 +159,17 @@ int main(void) {
 	BSP_COM_Init(COM1);
 	MX_TIM16_Init();
 	/* USER CODE BEGIN 2 */
-	BSP_ACCELERO_Init();
+	ACCELERO_StatusTypeDef ret = BSP_ACCELERO_Init();
+	if (ret != ACCELERO_OK) {
+		printf("Error: %d\n", ret);
+	}
 	ACC_InitGPIO();
 
 	/* Init scheduler */
 	osKernelInitialize();
 
-	tid_send = osThreadNew(Task_Send, NULL, &TaskSend_attributes);
+	// tid_send = osThreadNew(Task_Send, NULL, &TaskSend_attributes);
+	tid_send_rnn = osThreadNew(Task_Send_RNN, NULL, &TaskSendRNN_attributes);
 
 	/* USER CODE BEGIN RTOS_EVENTS */
 	/* add events, ... */
@@ -812,6 +825,84 @@ void Task_Send(void *argument) {
 			ax_sum = ay_sum = 0.0;
 		}
 
+		osDelayUntil(deadline);
+	}
+}
+
+void Task_Send_RNN(void *argument) {
+	MX_USB_DEVICE_Init();
+	// Calibration();
+
+	const float A = 1.0011583795355363, B = 0.995068796668601, C = 1.0;
+	const float D = -1.6759465583366173, E = -1.537611331891522, F = 8.423808603551663;
+
+	report = (report_t){
+		.buttonMask = 0,
+		.dx = 0,
+		.dy = 0,
+		.padding = 0,
+	};
+
+	const float interval = 0.01;
+	float hidden[LAYER_NUM][HIDDEN_SIZE] = {{0.0}},
+		  hidden_next[LAYER_NUM][HIDDEN_SIZE] = {{0.0}};
+	float output[2] = {0.0};
+	float scale = 32;
+	float buf_dx = 0, buf_dy = 0;
+	for (;;) {
+		// calculate current time interval
+		uint32_t deadline = osKernelGetTickCount() + osKernelGetTickFreq() / freq;
+
+		// sample accelerometer data
+		BSP_ACCELERO_AccGetXYZ(pDataXYZ);
+		// printf("%d, %d\n", pDataXYZ[0], pDataXYZ[1]);
+		// calibration
+		float data[2] = {pDataXYZ[0], pDataXYZ[1]};
+
+		float ax = (data[1] - E) / B;
+		float ay = -(data[0] - D) / A;
+
+		rnn(ax, ay, hidden, output, hidden_next);
+		for (int l = 0; l < LAYER_NUM; l++) {
+			for (int i = 0; i < HIDDEN_SIZE; i++) {
+				hidden[l][i] = hidden_next[l][i];
+			}
+		}
+
+		float vx = output[0];
+		float vy = output[1];
+
+		buf_dx += vx * interval * rnn_alpha * scale;
+		buf_dy -= vy * interval * rnn_alpha * scale;
+
+		if (buf_dx * 0.9 > 127.0) {
+			report.dx = 127;
+		} else if (buf_dy * 0.9 <= -128.0) {
+			report.dx = -128;
+		} else {
+			report.dx = (int)(buf_dx * 0.9);
+		}
+		if (buf_dy * 0.9 > 127.0) {
+			report.dy = 127;
+		} else if (buf_dy * 0.9 <= -128) {
+			report.dy = -128;
+		} else {
+			report.dy = (int)(buf_dy * 0.9);
+		}
+
+		buf_dx -= report.dx;
+		buf_dy -= report.dy;
+
+		if (report.dx <= 3 && report.dx >= -3) {
+			report.dx = 0;
+		}
+		if (report.dy <= 3 && report.dy >= -3) {
+			report.dy = 0;
+		}
+
+		printf("%d, %d\n", report.dx, report.dy);
+
+		USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
 		osDelayUntil(deadline);
 	}
 }
