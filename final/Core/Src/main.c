@@ -847,7 +847,7 @@ void Task_Send_RNN(void *argument) {
 	float hidden[LAYER_NUM][HIDDEN_SIZE] = {{0.0}},
 		  hidden_next[LAYER_NUM][HIDDEN_SIZE] = {{0.0}};
 	float output[2] = {0.0};
-	float scale = 32;
+	float scale = 16;
 	float buf_dx = 0, buf_dy = 0;
 	for (;;) {
 		// calculate current time interval
@@ -875,24 +875,23 @@ void Task_Send_RNN(void *argument) {
 		buf_dx += vx * interval * rnn_alpha * scale;
 		buf_dy -= vy * interval * rnn_alpha * scale;
 
-		if (buf_dx * 0.9 > 127.0) {
+		if (buf_dx * 0.5 > 127.0) {
 			report.dx = 127;
-		} else if (buf_dy * 0.9 <= -128.0) {
+		} else if (buf_dy * 0.5 <= -128.0) {
 			report.dx = -128;
 		} else {
-			report.dx = (int)(buf_dx * 0.9);
+			report.dx = (int)(buf_dx * 0.5);
 		}
-		if (buf_dy * 0.9 > 127.0) {
+		if (buf_dy * 0.5 > 127.0) {
 			report.dy = 127;
-		} else if (buf_dy * 0.9 <= -128) {
+		} else if (buf_dy * 0.5 <= -128) {
 			report.dy = -128;
 		} else {
-			report.dy = (int)(buf_dy * 0.9);
+			report.dy = (int)(buf_dy * 0.5);
 		}
 
 		buf_dx -= report.dx;
 		buf_dy -= report.dy;
-
 		if (report.dx <= 3 && report.dx >= -3) {
 			report.dx = 0;
 		}

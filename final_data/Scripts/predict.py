@@ -26,4 +26,4 @@ def predict_by_acc(filename):
 
 
 if __name__ == "__main__":
-    predict_by_acc("DATAS/data.txt")
+    predict_by_acc("Datas/data.txt")

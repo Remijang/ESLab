@@ -12,12 +12,12 @@ E = -1.537611331891522
 F = 8.423808603551663
 G = 1003.5581817562975
 
-DATA_FILE = "DATAS/data.txt"
-LABEL_FILE = "DATAS/label.txt"
+DATA_FILE = "Datas/data.txt"
+LABEL_FILE = "Datas/label.txt"
 
 MEAN = torch.tensor([0.0, 0.0])
 STD = torch.tensor([2.5, 2.5])
-AUGMENTED_RATIO = 4
+AUGMENTED_RATIO = 1
 DEVICE = "cuda"
 
 
@@ -106,7 +106,7 @@ class SimpleRNN(nn.Module):
 
     def forward(self, x):
         # x shape: (batch, seq_len, input_size)
-        h0 = torch.zeros(2, self.hidden_size, device=DEVICE)
+        h0 = torch.zeros(self.num_layers, self.hidden_size, device=DEVICE)
         out, hn = self.rnn(x, h0)
         hidden = out
         out = self.output(out)  # (batch, output_size)
@@ -120,35 +120,35 @@ INTERVAL = 0.01
 def main(args):
     dataset = RNNDataset()
     model = SimpleRNN(
-        input_size=2, hidden_size=args.hidden_size, output_size=2, num_layers=2
+        input_size=2, hidden_size=args.hidden_size, output_size=2, num_layers=args.layer
     ).to(DEVICE)
+    if args.load_path != "":
+        model.load_state_dict(torch.load(args.load_path))
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=0.01)
     N = len(dataset)
     pbar = tqdm(range(args.epochs))
     loss_history = []
-    for _ in pbar:
+    for epoch in pbar:
         model.train()
         total_loss = 0.0
+        optimizer.zero_grad()
+        batch_loss = torch.zeros((1,), device=DEVICE)
         for n in range(N):
             x, y = dataset[n]
-            optimizer.zero_grad()
             p = torch.tensor([0.0, 0.0], device=DEVICE)
             L = len(x)
             y_pred, _ = model(x)
             for i in range(L):
                 p += y_pred[i] * INTERVAL
-            loss = criterion(p * model.alpha, y)
-            loss.backward()
-            optimizer.step()
-
-            total_loss += loss.item()
-
-        avg_loss = total_loss / len(dataset)
-        pbar.set_postfix({"loss": f"{avg_loss:.3f}"})
-        loss_history.append(avg_loss)
-        if avg_loss == min(loss_history):
+            batch_loss += criterion(p * model.alpha, y)
+        batch_loss /= N
+        loss_history.append(batch_loss)
+        if batch_loss == min(loss_history):
             torch.save(model.state_dict(), args.save_path)
+        batch_loss.backward()
+        optimizer.step()
+        pbar.set_postfix({"train_loss": f"{batch_loss.item():.3f}"})
     print(f"Saved model params to {args.save_path}")
     print(f"minimum loss is {min(loss_history)}")
 
@@ -157,12 +157,18 @@ def parse():
     parser = argparse.ArgumentParser(description="Train SimpleRNN on custom dataset")
     parser.add_argument("--epochs", type=int, default=10000)
     parser.add_argument("--hidden_size", type=int, default=20)
+    parser.add_argument("--layer", type=int, default=2)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument(
         "--save_path",
         type=str,
         default="rnn_params.pth",
         help="Where to save model parameters (state_dict).",
+    )
+    parser.add_argument(
+        "--load_path",
+        type=str,
+        default="",
     )
     args = parser.parse_args()
     return args
