@@ -14,6 +14,8 @@ G = 1003.5581817562975
 
 DATA_FILE = "Datas/data.txt"
 LABEL_FILE = "Datas/label.txt"
+REG_DATA_FILE = "Datas/reg_data.txt"
+REG_LABEL_FILE = "Datas/reg_data.txt"
 
 MEAN = torch.tensor([0.0, 0.0])
 STD = torch.tensor([2.5, 2.5])
@@ -25,6 +27,8 @@ class RNNDataset:
     def __init__(self):
         self.data = self._load_file(DATA_FILE)
         self.label = self._load_label(LABEL_FILE)
+        self.rag_data = self._load_file(REG_DATA_FILE)
+        self.reg_label = self._load_reglabel(REG_LABEL_FILE)
 
     def _load_file(self, filename):
         result = []
@@ -60,6 +64,31 @@ class RNNDataset:
             augmented_result.append(result[i].to(DEVICE))
         return augmented_result
 
+    def _load_reglabel(self, filename):
+        result = []
+        augmented_result = []
+        count = -1
+
+        with open(filename, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+
+                if line.startswith("data"):
+                    result.append([])
+                    count += 1
+                    continue
+
+                nums = list(map(float, line.replace(" ", "").split(",")))
+                nums = torch.tensor(nums).unsqueeze(dim=0)
+                result[count].append(nums)
+        for i in range(count + 1):
+            result[i] = torch.cat(result[i])
+            for _ in range(AUGMENTED_RATIO):
+                augmented_result.append(result[i].clone().to(DEVICE))
+        return augmented_result
+
     def _load_label(self, filename):
         result = []
         augmented_result = []
@@ -73,7 +102,7 @@ class RNNDataset:
                 result.append(nums)
         for i in range(len(result)):
             for _ in range(AUGMENTED_RATIO):
-                augmented_result.append(result[i].to(DEVICE))
+                augmented_result.append(result[i].clone().to(DEVICE))
 
         return augmented_result
 
@@ -127,13 +156,15 @@ def main(args):
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=0.01)
     N = len(dataset)
+    M = len(dataset.reg_data)
     pbar = tqdm(range(args.epochs))
     loss_history = []
-    for epoch in pbar:
+    for _ in pbar:
         model.train()
         total_loss = 0.0
         optimizer.zero_grad()
         batch_loss = torch.zeros((1,), device=DEVICE)
+        reg_loss = torch.zeros((1,), device=DEVICE)
         for n in range(N):
             x, y = dataset[n]
             p = torch.tensor([0.0, 0.0], device=DEVICE)
@@ -142,13 +173,30 @@ def main(args):
             for i in range(L):
                 p += y_pred[i] * INTERVAL
             batch_loss += criterion(p * model.alpha, y)
+            with open("tmp.txt", "a") as f:
+                print(p * model.alpha, file=f)
         batch_loss /= N
-        loss_history.append(batch_loss)
-        if batch_loss == min(loss_history):
+
+        for n in range(M):
+            x, y = dataset.reg_data[n], dataset.reg_label[n]
+            p = torch.tensor([0.0, 0.0], device=DEVICE)
+            L = len(x)
+            y_pred, _ = model(x)
+            y_pred *= INTERVAL * model.alpha
+            reg_loss += criterion(y_pred, y)
+        reg_loss /= M
+        total_loss = batch_loss + args.reg_weight * reg_loss
+        loss_history.append(total_loss)
+        if total_loss == min(loss_history):
             torch.save(model.state_dict(), args.save_path)
-        batch_loss.backward()
+        total_loss.backward()
         optimizer.step()
-        pbar.set_postfix({"train_loss": f"{batch_loss.item():.3f}"})
+        pbar.set_postfix(
+            {
+                "train_loss": f"{batch_loss.item():.3f}",
+                "reg_loss": f"{reg_loss.item():.3f}",
+            }
+        )
     print(f"Saved model params to {args.save_path}")
     print(f"minimum loss is {min(loss_history)}")
 
@@ -159,6 +207,7 @@ def parse():
     parser.add_argument("--hidden_size", type=int, default=20)
     parser.add_argument("--layer", type=int, default=2)
     parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--reg_weight", type=float, default=1)
     parser.add_argument(
         "--save_path",
         type=str,
