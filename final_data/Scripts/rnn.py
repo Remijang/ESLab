@@ -184,8 +184,8 @@ def main(args):
             reg_loss += criterion(y_pred, y) * INTERVAL * INTERVAL
         reg_loss /= M
         total_loss = batch_loss + args.reg_weight * reg_loss
-        loss_history.append(total_loss)
-        if total_loss == min(loss_history):
+        loss_history.append(total_loss.item())
+        if total_loss.item() == min(loss_history):
             torch.save(model.state_dict(), args.save_path)
         total_loss.backward()
         optimizer.step()
