@@ -27,7 +27,7 @@ class RNNDataset:
     def __init__(self):
         self.data = self._load_file(DATA_FILE)
         self.label = self._load_label(LABEL_FILE)
-        self.rag_data = self._load_file(REG_DATA_FILE)
+        self.reg_data = self._load_file(REG_DATA_FILE)
         self.reg_label = self._load_reglabel(REG_LABEL_FILE)
 
     def _load_file(self, filename):
@@ -153,7 +153,7 @@ def main(args):
     ).to(DEVICE)
     if args.load_path != "":
         model.load_state_dict(torch.load(args.load_path))
-    criterion = nn.MSELoss()
+    criterion = nn.MSELoss(reduction="sum")
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=0.01)
     N = len(dataset)
     M = len(dataset.reg_data)
@@ -173,8 +173,6 @@ def main(args):
             for i in range(L):
                 p += y_pred[i] * INTERVAL
             batch_loss += criterion(p * model.alpha, y)
-            with open("tmp.txt", "a") as f:
-                print(p * model.alpha, file=f)
         batch_loss /= N
 
         for n in range(M):
@@ -182,8 +180,8 @@ def main(args):
             p = torch.tensor([0.0, 0.0], device=DEVICE)
             L = len(x)
             y_pred, _ = model(x)
-            y_pred *= INTERVAL * model.alpha
-            reg_loss += criterion(y_pred, y)
+            y_pred *= model.alpha
+            reg_loss += criterion(y_pred, y) * INTERVAL * INTERVAL
         reg_loss /= M
         total_loss = batch_loss + args.reg_weight * reg_loss
         loss_history.append(total_loss)
@@ -195,6 +193,7 @@ def main(args):
             {
                 "train_loss": f"{batch_loss.item():.3f}",
                 "reg_loss": f"{reg_loss.item():.3f}",
+                "total_loss": f"{total_loss.item():.3f}",
             }
         )
     print(f"Saved model params to {args.save_path}")
