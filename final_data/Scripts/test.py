@@ -15,10 +15,10 @@ INTERVAL = 0.01
 
 PNG_SAVE_FILE = "Datas/test.png"
 TRACE_FILE = "Datas/trace.txt"
-RNN_CHECKPOINT = "save-3"
+RNN_CHECKPOINT = "checkpoint-layer3"
 PARAMETER_FILE = "Datas/parameters.txt"
-DATA_FILE = "Datas/data.txt"
-LABEL_FILE = "Datas/label.txt"
+DATA_FILE = "Datas/data_reflection.txt"
+LABEL_FILE = "Datas/label_reflection.txt"
 
 
 # ==========================================
@@ -306,8 +306,8 @@ def main_merged():
     param_grid = {
         "window": [i for i in range(1, 21)],  # best 12
         "threshold": np.arange(0.01, 0.51, 0.01),  # best 0.21
-        "frames": [i for i in range(1, 21)],  # best 3
-        "alpha": [0.01 * i for i in range(1, 21)],  # best 0.07
+        "frames": [i for i in range(1, 11)],  # best 3
+        "alpha": [0.01 * i for i in range(0, 21)],  # best 0.07
     }
     best_params, min_err = run_gpu_grid_search(
         acc_metric_list, labels_vec, param_grid, device
