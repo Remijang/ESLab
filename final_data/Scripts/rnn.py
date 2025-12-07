@@ -183,7 +183,8 @@ def main(args):
             y_pred *= model.alpha
             reg_loss += criterion(y_pred, y) * INTERVAL * INTERVAL
         reg_loss /= M
-        total_loss = batch_loss + args.reg_weight * reg_loss
+        # total_loss = batch_loss + args.reg_weight * reg_loss
+        total_loss = reg_loss
         loss_history.append(total_loss.item())
         if total_loss.item() == min(loss_history):
             torch.save(model.state_dict(), args.save_path)
@@ -191,7 +192,7 @@ def main(args):
         optimizer.step()
         pbar.set_postfix(
             {
-                "train_loss": f"{batch_loss.item():.3f}",
+                # "train_loss": f"{batch_loss.item():.3f}",
                 "reg_loss": f"{reg_loss.item():.3f}",
                 "total_loss": f"{total_loss.item():.3f}",
             }
