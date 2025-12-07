@@ -809,17 +809,20 @@ void Task_Send(void *argument) {
 			data[i] += cal_data.offset[i];
 			data[i] *= cal_data.gain[i];
 		}
-		ax = -data[1], ay = data[0];
-
+		ax = data[1], ay = data[0];
 		buff_x[ptr_x++] = ax, buff_y[ptr_y++] = ay;
+		ptr_x = (ptr_x == window) ? 0 : ptr_x;
+		ptr_y = (ptr_y == window) ? 0 : ptr_y;
 		++count;
 
 		// x
 		if (count >= window) {
-			if (var(buff_x, window) < threshold) cx += 1;
-			else cx = 0;
-		}
-		else cx += 1;
+			if (var(buff_x, window) < threshold)
+				cx += 1;
+			else
+				cx = 0;
+		} else
+			cx += 1;
 		if (cx >= frames) {
 			vx = 0.0;
 			bx = (1 - alpha) * bx + alpha * ax;
@@ -827,27 +830,28 @@ void Task_Send(void *argument) {
 			vx += (ax - bx) * dt;
 			px += vx * dt;
 		}
-		
+
 		// y
 		if (count >= window) {
-			if (var(buff_y, window) < threshold) cy += 1;
-			else cy = 0;
-		}
-		else cy += 1;
+			if (var(buff_y, window) < threshold)
+				cy += 1;
+			else
+				cy = 0;
+		} else
+			cy += 1;
 		if (cy >= frames) {
 			vy = 0.0;
 			by = (1 - alpha) * by + alpha * ay;
 		} else {
 			vy += (ay - by) * dt;
-			px += vx * dt;
+			py += vy * dt;
 		}
 
 		// print velocity (cm), position (cm)
 		printf("%f\t %f\t %f\t %f\n", vx * 100, vy * 100, px * 100, py * 100);
-		
-		report.dx = (char) (vx * 100);
-		report.dy = (char) (vy * 100);
-		
+
+		report.dx = (char)((int)(vx * 10));
+		report.dy = (char)((int)(vy * 10));
 		USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
 		osDelayUntil(deadline);
 	}

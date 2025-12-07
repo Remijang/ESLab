@@ -317,7 +317,7 @@ def main_merged():
     # 3. RNN 模型載入
     print("--- RNN Processing ---")
     # 定義模型 (2層, Hidden 20)
-    rnn_model = SimpleRNN(input_size=2, hidden_size=20, output_size=2, num_layers=2).to(
+    rnn_model = SimpleRNN(input_size=2, hidden_size=20, output_size=2, num_layers=3).to(
         device
     )
 
