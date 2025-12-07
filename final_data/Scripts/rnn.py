@@ -15,7 +15,7 @@ G = 1003.5581817562975
 DATA_FILE = "Datas/data.txt"
 LABEL_FILE = "Datas/label.txt"
 REG_DATA_FILE = "Datas/reg_data.txt"
-REG_LABEL_FILE = "Datas/reg_data.txt"
+REG_LABEL_FILE = "Datas/reg_label.txt"
 
 MEAN = torch.tensor([0.0, 0.0])
 STD = torch.tensor([2.5, 2.5])
