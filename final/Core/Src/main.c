@@ -167,8 +167,8 @@ int main(void) {
 	/* Init scheduler */
 	osKernelInitialize();
 
-	// tid_send = osThreadNew(Task_Send, NULL, &TaskSend_attributes);
-	tid_send_rnn = osThreadNew(Task_Send_RNN, NULL, &TaskSendRNN_attributes);
+	tid_send = osThreadNew(Task_Send, NULL, &TaskSend_attributes);
+	// tid_send_rnn = osThreadNew(Task_Send_RNN, NULL, &TaskSendRNN_attributes);
 
 	/* USER CODE BEGIN RTOS_EVENTS */
 	/* add events, ... */
@@ -850,6 +850,7 @@ void Task_Send(void *argument) {
 		
 		USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
 		osDelayUntil(deadline);
+	}
 }
 
 void Task_Send_RNN(void *argument) {
