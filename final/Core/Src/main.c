@@ -39,7 +39,6 @@
 #define timerDelay 300U
 #define NUM_SAMPLE 18
 
-#define ENABLE_RNN 0
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -75,7 +74,6 @@ const osThreadAttr_t TaskSendRNN_attributes = {
 int16_t pDataXYZ[3];
 report_t report;
 uint32_t freq = 100;
-uint32_t update_freq = 100;
 
 extern USBD_HandleTypeDef hUsbDeviceFS;
 extern const float rnn_alpha;
@@ -103,7 +101,6 @@ float32_t sample_data[NUM_SAMPLE][3] = {
 typedef struct {
 	float offset[3];
 	float gain[3];
-	float post_offset[3];
 } SensorCal_t;
 
 SensorCal_t cal_data;
@@ -755,8 +752,15 @@ void Calibration() {
 	}
 }
 
-void rnn(float *vx, float *vy) {
-  return;
+float var(float *x, int n) {
+	float sum = 0.0, sum2 = 0.0;
+	for (int i = 0; i < n; ++i) {
+		sum2 += x[i] * x[i];
+		sum += x[i];
+	}
+	sum /= n;
+	sum2 /= n;
+	return sum2 - sum * sum;
 }
 
 void Task_Send(void *argument) {
@@ -776,21 +780,21 @@ void Task_Send(void *argument) {
 		.padding = 0,
 	};
 
-  float vx = 0.0, vy = 0.0;
+	int window = 12;
+	float threshold = 0.21 * 0.21;
+	int frames = 3;
+	float alpha = 0.07;
+	float dt = 1.0 / freq;
 
-  float x = 0.0, y = 0.0;
-
-  int count = 0;
-
-	float sum[2] = {0.0};
-
-	float ax_sum = 0.0, ay_sum = 0.0;
-
-  float subsample = freq / update_freq;
-
-  float update_interval = 1.0f / update_freq;
-
-  float threshold = 3600.0f;
+	float ax = 0.0, ay = 0.0;
+	float vx = 0.0, vy = 0.0;
+	float px = 0.0, py = 0.0;
+	float bx = 0.0, by = 0.0;
+	float buff_x[window];
+	float buff_y[window];
+	int ptr_x = 0, ptr_y = 0;
+	int cx = 0, cy = 0;
+	int count = 0;
 
 	for (;;) {
 		// calculate current time interval
@@ -804,62 +808,48 @@ void Task_Send(void *argument) {
 		for (int i = 0; i < 2; ++i) {
 			data[i] += cal_data.offset[i];
 			data[i] *= cal_data.gain[i];
-			sum[i] += data[i];
-			data[i] += cal_data.post_offset[i];
+		}
+		ax = -data[1], ay = data[0];
+
+		buff_x[ptr_x++] = ax, buff_y[ptr_y++] = ay;
+		++count;
+
+		// x
+		if (count >= window) {
+			if (var(buff_x, window) < threshold) cx += 1;
+			else cx = 0;
+		}
+		else cx += 1;
+		if (cx >= frames) {
+			vx = 0.0;
+			bx = (1 - alpha) * bx + alpha * ax;
+		} else {
+			vx += (ax - bx) * dt;
+			px += vx * dt;
+		}
+		
+		// y
+		if (count >= window) {
+			if (var(buff_y, window) < threshold) cy += 1;
+			else cy = 0;
+		}
+		else cy += 1;
+		if (cy >= frames) {
+			vy = 0.0;
+			by = (1 - alpha) * by + alpha * ay;
+		} else {
+			vy += (ay - by) * dt;
+			px += vx * dt;
 		}
 
-    // reset post offset when it is stop
-    if (++count % freq == 0) {
-      float eval = sum[0] * sum[0] + sum[1] * sum[1];
-      if (eval < threshold) {
-        cal_data.post_offset[0] = -sum[0] / freq;
-        cal_data.post_offset[1] = -sum[1] / freq;
-      }
-      sum[0] = sum[1] = 0.0;
-    }
-    
-    ax_sum += -1.0 * data[1], ay_sum += 1.0 * data[0];
-
-    if (count % subsample == 0) {
-      ax_sum /= subsample;
-      ay_sum /= subsample;
-      
-#if ENABLE_RNN == 0
-      vx += ax_sum * update_interval;
-      vy += ay_sum * update_interval;
-#else
-      rnn(&vx, &vy);
-#endif
-
-      x += vx * update_interval;
-      y += vy * update_interval;
-
-      // print velocity (cm), position (cm)
-      printf("%f\t %f\t %f\t %f\n", vx * 100, vy * 100, x * 100, y * 100);
-      
-      report.dx = (char) (vx * 100);
-      report.dy = (char) (vy * 100);
-      
-      USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
-
-		if (count % (freq / update_freq) == 0) {
-			ax_sum *= scale, ay_sum *= scale;
-			for (int i = 0; i < freq / update_freq; ++i) {
-				vx = alpha * vx + ax_sum;
-				vy = alpha * vy + ay_sum;
-			}
-			printf("%f\t %f\t %f\t %f\n", vx * 1000, vy * 1000, ax_sum, ay_sum);
-
-			report.dx = (char)vx;
-			report.dy = (char)vy;
-
-			USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
-
-			ax_sum = ay_sum = 0.0;
-		}
-
+		// print velocity (cm), position (cm)
+		printf("%f\t %f\t %f\t %f\n", vx * 100, vy * 100, px * 100, py * 100);
+		
+		report.dx = (char) (vx * 100);
+		report.dy = (char) (vy * 100);
+		
+		USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
 		osDelayUntil(deadline);
-	}
 }
 
 void Task_Send_RNN(void *argument) {
