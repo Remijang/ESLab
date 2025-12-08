@@ -55,24 +55,15 @@ def format_3d_array(tensor):
     blocks = []
     
     for i in range(tensor.shape[0]):
-        # Format the 2D block
-        block_str = format_2d_array(tensor[i], indent=0)
-        # Indent the whole block
-        indented_block = []
-        for line in block_str.split('\n'):
-            indented_block.append(f"\t{{{line}")
-        
-        # Close the block
-        joined_block = "\n".join(indented_block)
-        joined_block = joined_block.replace("\t{", "\t{", 1) # Fix first brace
-        
-        # Add closing brace for the 2D block
-        joined_block += "}"
+        raw_2d_str = format_2d_array(tensor[i])
+        indented_lines = [f"\t{line}" for line in raw_2d_str.split('\n')]
+        indented_content = "\n".join(indented_lines)
+        block_str = f"\t{{\n{indented_content}\n\t}}"
         
         if i < tensor.shape[0] - 1:
-            joined_block += ","
+            block_str += ","
             
-        blocks.append(joined_block)
+        blocks.append(block_str)
         
     return "\n".join(blocks)
 
