@@ -104,6 +104,36 @@ typedef struct {
 } SensorCal_t;
 
 SensorCal_t cal_data;
+
+// hyperparameters
+int window = 12;
+float threshold = 0.21 * 0.21;
+int frames = 3;
+float alpha = 0.07;
+
+// variables
+float ax = 0.0, ay = 0.0;
+float vx = 0.0, vy = 0.0;
+float px = 0.0, py = 0.0;
+float bx = 0.0, by = 0.0;
+int ptr_x = 0, ptr_y = 0;
+int cx = 0, cy = 0;
+int count = 0;
+
+// helpers
+float pre_ax = 0.0, pre_ay = 0.0;
+float sum_x = 0.0, sum_x2 = 0.0, ex = 0.0, ex2 = 0.0;
+float sum_y = 0.0, sum_y2 = 0.0, ey = 0.0, ey2 = 0.0;
+float var_x = 0.0, var_y = 0.0;
+
+// numeric
+float target_x, target_y;
+int tmp_x, tmp_y;
+int clamp_x, clamp_y;
+char final_x, final_y;
+float res_x = 0.0, res_y = 0.0;
+float px2 = 0.0, py2 = 0.0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -752,17 +782,6 @@ void Calibration() {
 	}
 }
 
-float var(float *x, int n) {
-	float sum = 0.0, sum2 = 0.0;
-	for (int i = 0; i < n; ++i) {
-		sum2 += x[i] * x[i];
-		sum += x[i];
-	}
-	sum /= n;
-	sum2 /= n;
-	return sum2 - sum * sum;
-}
-
 void Task_Send(void *argument) {
 	MX_USB_DEVICE_Init();
 	Calibration();
@@ -780,21 +799,13 @@ void Task_Send(void *argument) {
 		.padding = 0,
 	};
 
-	int window = 12;
-	float threshold = 0.21 * 0.21;
-	int frames = 3;
-	float alpha = 0.07;
+	// hyperparameters
 	float dt = 1.0 / freq;
+	float scale = 10.0;
 
-	float ax = 0.0, ay = 0.0;
-	float vx = 0.0, vy = 0.0;
-	float px = 0.0, py = 0.0;
-	float bx = 0.0, by = 0.0;
-	float buff_x[window];
-	float buff_y[window];
-	int ptr_x = 0, ptr_y = 0;
-	int cx = 0, cy = 0;
-	int count = 0;
+	// variables
+	float buff_x[window] = {};
+	float buff_y[window] = {};
 
 	for (;;) {
 		// calculate current time interval
@@ -809,15 +820,30 @@ void Task_Send(void *argument) {
 			data[i] += cal_data.offset[i];
 			data[i] *= cal_data.gain[i];
 		}
-		ax = data[1], ay = data[0];
+		ax = data[1], ay = -data[0];
+		pre_ax = buff_x[ptr_x], pre_ay = buff_y[ptr_y];
 		buff_x[ptr_x++] = ax, buff_y[ptr_y++] = ay;
 		ptr_x = (ptr_x == window) ? 0 : ptr_x;
 		ptr_y = (ptr_y == window) ? 0 : ptr_y;
+
+		sum_x += ax - pre_ax;
+		sum_x2 += ax * ax - pre_ax * pre_ax;
+		sum_y += ay - pre_ay;
+		sum_y2 += ay * ay - pre_ay * pre_ay;
+
+		ex = sum_x / window;
+		ex2 = sum_x2 / window;
+		ey = sum_y / window;
+		ey2 = sum_y2 / window;
+
+		var_x = ex2 - ex * ex;
+		var_y = ey2 - ey * ey;
+
 		++count;
 
 		// x
 		if (count >= window) {
-			if (var(buff_x, window) < threshold)
+			if (var_x < threshold)
 				cx += 1;
 			else
 				cx = 0;
@@ -833,7 +859,7 @@ void Task_Send(void *argument) {
 
 		// y
 		if (count >= window) {
-			if (var(buff_y, window) < threshold)
+			if (var_y < threshold)
 				cy += 1;
 			else
 				cy = 0;
@@ -847,11 +873,33 @@ void Task_Send(void *argument) {
 			py += vy * dt;
 		}
 
-		// print velocity (cm), position (cm)
-		printf("%f\t %f\t %f\t %f\n", vx * 100, vy * 100, px * 100, py * 100);
+		// calculate theoritical velocity
+		target_x = (vx * scale) + res_x;
+		target_y = (vy * scale) + res_y;
 
-		report.dx = (char)((int)(vx * 10));
-		report.dy = (char)((int)(vy * 10));
+		// casting (float -> int)
+		tmp_x = (int) target_x;
+		tmp_y = (int) target_y;
+
+		// clamp
+		clamp_x = (tmp_x >= 127) ? 127 : (tmp_x <= -128) ? -128 : tmp_x;
+		clamp_y = (tmp_y >= 127) ? 127 : (tmp_y <= -128) ? -128 : tmp_y;
+
+		// casting (int -> char)
+		final_x = (char) clamp_x;
+		final_y = (char) clamp_y;
+
+		// update residue
+		res_x = target_x - (float) clamp_x;
+		res_y = target_y - (float) clamp_y;
+
+		px2 += (float) clamp_x * dt / scale;
+		py2 += (float) clamp_y * dt / scale;
+
+		printf("%d\t%d\t%.2f\t%.2f\t   %.2f\t%.2f\t%.2f\t%.2f\t\n", tmp_x, tmp_y, res_x, res_y, px, py, px2, py2);
+
+		report.dx = final_x;
+		report.dy = final_y;
 		USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
 		osDelayUntil(deadline);
 	}
