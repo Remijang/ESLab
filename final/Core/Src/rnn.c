@@ -298,7 +298,7 @@ static inline float tanh_stable(float x) {
 }
 
 // https://www.musicdsp.org/en/latest/Other/238-rational-tanh-approximation.html
-static inline float rational_tanh(x)
+static inline float rational_tanh(float x)
 {
     if( x < -3 )
         return -1;
@@ -329,22 +329,33 @@ static inline float tanh_c3(float v)
 static arm_matrix_instance_f32 mat_hh[LAYER_NUM] = {
     {HIDDEN_SIZE, HIDDEN_SIZE, (float*)weight_hh[0]},
     {HIDDEN_SIZE, HIDDEN_SIZE, (float*)weight_hh[1]},
-    {HIDDEN_SIZE, HIDDEN_SIZE, (float*)weight_hh[2]},
-    {HIDDEN_SIZE, HIDDEN_SIZE, (float*)weight_hh[3]},
 };
 
-static float buf[HIDDEN_SIZE];
+static arm_matrix_instance_f32 mat_ih[LAYER_NUM - 1] = {
+    {HIDDEN_SIZE, HIDDEN_SIZE, (float*)weight_ih_layers[0]},
+};
+
+static arm_matrix_instance_f32 mat_out = {
+	2, HIDDEN_SIZE, (float*)weight_output
+};
+
+static float mat_buf[HIDDEN_SIZE];
+static float out_buf[2];
+
+static arm_matrix_instance_f32 hh;
+static arm_matrix_instance_f32 ih;
+static arm_matrix_instance_f32 oh;
+static arm_matrix_instance_f32 buf;
 
 void rnn_dsp(
 	float ax, float ay, float hidden[LAYER_NUM][HIDDEN_SIZE], float output[2],
 	float hidden_next[LAYER_NUM][HIDDEN_SIZE]
 ) {
-	arm_matrix_instance_f32 W_hh;
-	arm_matrix_instance_f32 W_ih;
-	arm_matrix_instance_f32 W_out;
+	// hh = hidden[0]
+	arm_mat_init_f32(&hh, HIDDEN_SIZE, 1, (float *) hidden[0]);
 
-	// W_hh = weight_hh[0]
-	arm_mat_init_f32(&W_hh, HIDDEN_SIZE, HIDDEN_SIZE, (float*)weight_hh[0]);
+	// buf = mat_buf
+	arm_mat_init_f32(&buf, HIDDEN_SIZE, 1, (float *) mat_buf);
 
 	for (int i = 0; i < HIDDEN_SIZE; ++i) {
 		// W_in \cdot x
@@ -354,11 +365,11 @@ void rnn_dsp(
 		hidden_next[0][i] = tmp;
 	}
 
-	// W_hh \cdot h[0]
-    arm_mat_vec_mult_f32(&W_hh, hidden[0], buf);
+	// W_hh[0] \cdot h[0]
+    arm_mat_mult_f32(&mat_hh[0], &hh, &buf);
 
-	// h_next[0] = W_in \cdot x + W_hh \cdot h[0] + bias
-    arm_add_f32(hidden_next[0], buf, hidden_next[0], HIDDEN_SIZE);
+	// h_next[0] = W_in \cdot x + W_hh[0] \cdot h[0] + bias
+    arm_add_f32(hidden_next[0], mat_buf, hidden_next[0], HIDDEN_SIZE);
 
 	// h_next[0] = tanh(h_next[0])
 	for (int i = 0; i < HIDDEN_SIZE; ++i) {
@@ -366,42 +377,43 @@ void rnn_dsp(
 	}
 
 	for (int l = 1; l < LAYER_NUM; ++l) {
-		// W_hh = weight_hh[l]
-		arm_mat_init_f32(&W_hh, HIDDEN_SIZE, HIDDEN_SIZE, (float*)weight_hh[l]);
-		
-		// W_ih = weight_ih_layers[l - 1]
-		arm_mat_init_f32(&W_ih, HIDDEN_SIZE, HIDDEN_SIZE, (float*)weight_ih_layers[l-1]);
+		// hh = hidden[l]
+		arm_mat_init_f32(&hh, HIDDEN_SIZE, 1, (float *) hidden[l]);
+
+		// ih = hidden_next[l - 1]
+		arm_mat_init_f32(&ih, HIDDEN_SIZE, 1, (float *) hidden_next[l - 1]);
 
 		// bias = bias_hh + bias_ih
 		arm_add_f32((float*)bias_hh[l], (float*)bias_ih[l], hidden_next[l], HIDDEN_SIZE);
 		
-		// W_hh \cdot h
-		arm_mat_vec_mult_f32(&W_hh, hidden[l], buf);
+		// W_hh[l] \cdot h[l]
+		arm_mat_mult_f32(&mat_hh[l], &hh, &buf);
 
-		// h_next[l] = W_hh \cdot h + bias
-		arm_add_f32(hidden_next[l], buf, hidden_next[l], HIDDEN_SIZE);
+		// h_next[l] = W_hh \cdot h[l] + bias
+		arm_add_f32(hidden_next[l], mat_buf, hidden_next[l], HIDDEN_SIZE);
 
-		// W_ih \cdot h_next[l - 1]
-		arm_mat_vec_mult_f32(&W_ih, hidden_next[l-1], buf);
+		// W_ih[l - 1] \cdot h_next[l - 1]
+		arm_mat_mult_f32(&mat_ih[l - 1], &ih, &buf);
 
-		// h_next[l] = W_hh \cdot h + W_ih \cdot h_next[l - 1] + bias
-		arm_add_f32(hidden_next[l], buf, hidden_next[l], HIDDEN_SIZE);
+		// h_next[l] = W_hh[l] \cdot h[l] + W_ih[l - 1] \cdot h_next[l - 1] + bias
+		arm_add_f32(hidden_next[l], mat_buf, hidden_next[l], HIDDEN_SIZE);
 
 		// h_next[l] = tanh(h_next[l])
 		for(int i=0; i<HIDDEN_SIZE; i++) {
             hidden_next[l][i] = tanh_c3(hidden_next[l][i]);
         }
 	}
+	// oh = hidden_next[L - 1]
+	arm_mat_init_f32(&oh, HIDDEN_SIZE, 1, (float *) hidden_next[LAYER_NUM - 1]);
 
-	// W_out = weight_output
-	arm_mat_init_f32(&W_out, 2, HIDDEN_SIZE, (float*)weight_output);
-    float out_buf[2];
+	// buf = out_buf
+	arm_mat_init_f32(&buf, 2, 1, (float *) out_buf);
 	
 	// bias = bias_output
 	output[0] = bias_output[0], output[1] = bias_output[1];
     
 	// W_out \cdot h_next[L - 1]
-    arm_mat_vec_mult_f32(&W_out, hidden_next[LAYER_NUM-1], out_buf);
+    arm_mat_mult_f32(&mat_out, &oh, &buf);
     
 	// output = W_out \cdot h_next[L - 1] + bias
     output[0] += out_buf[0], output[1] += out_buf[1];

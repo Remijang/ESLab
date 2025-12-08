@@ -197,8 +197,8 @@ int main(void) {
 	/* Init scheduler */
 	osKernelInitialize();
 
-	tid_send = osThreadNew(Task_Send, NULL, &TaskSend_attributes);
-	// tid_send_rnn = osThreadNew(Task_Send_RNN, NULL, &TaskSendRNN_attributes);
+	//tid_send = osThreadNew(Task_Send, NULL, &TaskSend_attributes);
+	tid_send_rnn = osThreadNew(Task_Send_RNN, NULL, &TaskSendRNN_attributes);
 
 	/* USER CODE BEGIN RTOS_EVENTS */
 	/* add events, ... */
@@ -920,8 +920,8 @@ void Task_Send_RNN(void *argument) {
 	};
 
 	const float interval = 0.01;
-	float hidden[LAYER_NUM][HIDDEN_SIZE] = {{0.0}},
-		  hidden_next[LAYER_NUM][HIDDEN_SIZE] = {{0.0}};
+	float hidden[2][LAYER_NUM][HIDDEN_SIZE] = {{{0.0}}};
+	int t = 0;
 	float output[2] = {0.0};
 	float scale = 16;
 	float buf_dx = 0, buf_dy = 0;
@@ -938,12 +938,8 @@ void Task_Send_RNN(void *argument) {
 		float ax = (data[1] - E) / B;
 		float ay = -(data[0] - D) / A;
 
-		rnn(ax, ay, hidden, output, hidden_next);
-		for (int l = 0; l < LAYER_NUM; l++) {
-			for (int i = 0; i < HIDDEN_SIZE; i++) {
-				hidden[l][i] = hidden_next[l][i];
-			}
-		}
+		rnn_dsp(ax, ay, hidden[t], output, hidden[t ^ 1]);
+		t ^= 1;
 
 		float vx = output[0];
 		float vy = output[1];
