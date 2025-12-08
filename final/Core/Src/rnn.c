@@ -1,6 +1,7 @@
 #include "rnn.h"
 
 #include "math.h"
+#include "arm_math.h"
 
 /*  the following variables should not be able to access beyond this scope */
 const float rnn_alpha = 4.0104;	 // alpha is used to make rnn able to convert
@@ -286,7 +287,7 @@ const float weight_output[2][HIDDEN_SIZE] = {
 const float bias_output[2] = {-0.2470, -0.1342};
 
 // a stable tanh
-float tanh_stable(float x) {
+static inline float tanh_stable(float x) {
 	if (x >= 0) {
 		float exp2x = exp(-2.0f * x);
 		return -(1.0f - 2.0f / (1.0f + exp2x));
@@ -294,6 +295,116 @@ float tanh_stable(float x) {
 		float exp2x = exp(2.0f * x);
 		return -(2.0f / (1.0f + exp2x) - 1.0f);
 	}
+}
+
+// https://www.musicdsp.org/en/latest/Other/238-rational-tanh-approximation.html
+static inline float rational_tanh(x)
+{
+    if( x < -3 )
+        return -1;
+    else if( x > 3 )
+        return 1;
+    else
+        return x * ( 27 + x * x ) / ( 27 + 9 * x * x );
+}
+
+// https://math.stackexchange.com/a/3485944
+static inline float tanh_c3(float v)
+{
+    const float c1 = 0.03138777F;
+    const float c2 = 0.276281267F;
+    const float c_log2f = 1.442695022F;
+    v *= c_log2f;
+    int intPart = (int)v;
+    float x = (v - intPart);
+    float xx = x * x;
+    float v1 = c_log2f + c2 * xx;
+    float v2 = x + xx * c1 * x;
+    float v3 = (v2 + v1);
+    *((int*)&v3) += intPart << 24;
+    float v4 = v2 - v1;
+    return (v3 + v4) / (v3 - v4);
+}
+
+static arm_matrix_instance_f32 mat_hh[LAYER_NUM] = {
+    {HIDDEN_SIZE, HIDDEN_SIZE, (float*)weight_hh[0]},
+    {HIDDEN_SIZE, HIDDEN_SIZE, (float*)weight_hh[1]},
+    {HIDDEN_SIZE, HIDDEN_SIZE, (float*)weight_hh[2]},
+    {HIDDEN_SIZE, HIDDEN_SIZE, (float*)weight_hh[3]},
+};
+
+static float buf[HIDDEN_SIZE];
+
+void rnn_dsp(
+	float ax, float ay, float hidden[LAYER_NUM][HIDDEN_SIZE], float output[2],
+	float hidden_next[LAYER_NUM][HIDDEN_SIZE]
+) {
+	arm_matrix_instance_f32 W_hh;
+	arm_matrix_instance_f32 W_ih;
+	arm_matrix_instance_f32 W_out;
+
+	// W_hh = weight_hh[0]
+	arm_mat_init_f32(&W_hh, HIDDEN_SIZE, HIDDEN_SIZE, (float*)weight_hh[0]);
+
+	for (int i = 0; i < HIDDEN_SIZE; ++i) {
+		// W_in \cdot x
+		float tmp = weight_ih[i][0] * ax + weight_ih[i][1] * ay;
+		// bias = bias_hh + bias_ih
+		tmp += bias_hh[0][i] + bias_ih[0][i];
+		hidden_next[0][i] = tmp;
+	}
+
+	// W_hh \cdot h[0]
+    arm_mat_vec_mult_f32(&W_hh, hidden[0], buf);
+
+	// h_next[0] = W_in \cdot x + W_hh \cdot h[0] + bias
+    arm_add_f32(hidden_next[0], buf, hidden_next[0], HIDDEN_SIZE);
+
+	// h_next[0] = tanh(h_next[0])
+	for (int i = 0; i < HIDDEN_SIZE; ++i) {
+		hidden_next[0][i] = tanh_c3(hidden_next[0][i]);
+	}
+
+	for (int l = 1; l < LAYER_NUM; ++l) {
+		// W_hh = weight_hh[l]
+		arm_mat_init_f32(&W_hh, HIDDEN_SIZE, HIDDEN_SIZE, (float*)weight_hh[l]);
+		
+		// W_ih = weight_ih_layers[l - 1]
+		arm_mat_init_f32(&W_ih, HIDDEN_SIZE, HIDDEN_SIZE, (float*)weight_ih_layers[l-1]);
+
+		// bias = bias_hh + bias_ih
+		arm_add_f32((float*)bias_hh[l], (float*)bias_ih[l], hidden_next[l], HIDDEN_SIZE);
+		
+		// W_hh \cdot h
+		arm_mat_vec_mult_f32(&W_hh, hidden[l], buf);
+
+		// h_next[l] = W_hh \cdot h + bias
+		arm_add_f32(hidden_next[l], buf, hidden_next[l], HIDDEN_SIZE);
+
+		// W_ih \cdot h_next[l - 1]
+		arm_mat_vec_mult_f32(&W_ih, hidden_next[l-1], buf);
+
+		// h_next[l] = W_hh \cdot h + W_ih \cdot h_next[l - 1] + bias
+		arm_add_f32(hidden_next[l], buf, hidden_next[l], HIDDEN_SIZE);
+
+		// h_next[l] = tanh(h_next[l])
+		for(int i=0; i<HIDDEN_SIZE; i++) {
+            hidden_next[l][i] = tanh_c3(hidden_next[l][i]);
+        }
+	}
+
+	// W_out = weight_output
+	arm_mat_init_f32(&W_out, 2, HIDDEN_SIZE, (float*)weight_output);
+    float out_buf[2];
+	
+	// bias = bias_output
+	output[0] = bias_output[0], output[1] = bias_output[1];
+    
+	// W_out \cdot h_next[L - 1]
+    arm_mat_vec_mult_f32(&W_out, hidden_next[LAYER_NUM-1], out_buf);
+    
+	// output = W_out \cdot h_next[L - 1] + bias
+    output[0] += out_buf[0], output[1] += out_buf[1];
 }
 
 void rnn(
