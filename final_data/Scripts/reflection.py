@@ -13,6 +13,7 @@ LABEL_FILE = "Datas/label.txt"
 SAVE_DATA_FILE = "Datas/data_reflection.txt"
 SAVE_LABEL_FILE = "Datas/label_reflection.txt"
 
+
 def load_parameters(filepath):
     params = {}
     try:
@@ -62,6 +63,7 @@ def load_labels(filepath):
         print(f"警告: 找不到 {filepath}")
     return labels
 
+
 def main():
     dataset_raw = load_data(DATA_FILE)
     labels_vec = load_labels(LABEL_FILE)
@@ -73,22 +75,23 @@ def main():
     dataset_out = ""
     labels_out = ""
 
-    def reverse(raw_x, raw_y, sign_x, sign_y):
-        cal_x = (raw_x - d) / a
-        cal_y = (raw_y - e) / b
+    def reverse(raw_x, raw_y, sign_x, sign_y, bias_x, bias_y):
+        cal_x = (raw_x - d - bias_x) / a
+        cal_y = (raw_y - e - bias_y) / b
         cal_x *= sign_x
         cal_y *= sign_y
-        ret_x = cal_x * a + d
-        ret_y = cal_y * b + e
-        return ret_x, ret_y
-
+        ret_x = cal_x * a + d + bias_x
+        ret_y = cal_y * b + e + bias_y
+        return int(ret_x), int(ret_y)
 
     def reflection(idx, flip_x: bool, flip_y: bool, data_out: str, label_out: str):
         sign_x = -1 if flip_x is True else 1
         sign_y = -1 if flip_y is True else 1
         data_out += "data\n"
+        bias_x = sum([dataset_raw[idx][i][0] for i in range(10)]) / 10
+        bias_y = sum([dataset_raw[idx][i][1] for i in range(10)]) / 10
         for data in dataset_raw[idx]:
-            x, y = reverse(data[0], data[1], sign_x=sign_x, sign_y=sign_y)
+            x, y = reverse(data[0], data[1], sign_x, sign_y, bias_x, bias_y)
             data_out += f"{x}, {y}\n"
         label_x = labels_vec[idx][0] * sign_y
         label_y = labels_vec[idx][1] * sign_x
@@ -104,7 +107,7 @@ def main():
     with open(SAVE_DATA_FILE, "w", encoding="utf-8") as f:
         f.write(dataset_out)
         f.close()
-        
+
     with open(SAVE_LABEL_FILE, "w", encoding="utf-8") as f:
         f.write(labels_out)
         f.close()

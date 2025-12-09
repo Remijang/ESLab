@@ -3,9 +3,11 @@ import torch.nn as nn
 import numpy as np
 import re
 import matplotlib.pyplot as plt
+import matplotlib
 from collections import OrderedDict, deque
 import itertools
 from tqdm import tqdm
+import argparse
 
 # 全域常數 (對應您的 train.py)
 A = 1.0011583795355363
@@ -16,7 +18,7 @@ INTERVAL = 0.01
 
 PNG_SAVE_FILE = "Datas/test.png"
 TRACE_FILE = "Datas/trace.txt"
-RNN_CHECKPOINT = "checkpoint-layer3-pa"
+RNN_CHECKPOINT = "checkpoint"
 PARAMETER_FILE = "Datas/parameters.txt"
 DATA_FILE = "Datas/data_reflection.txt"
 LABEL_FILE = "Datas/label_reflection.txt"
@@ -107,11 +109,19 @@ def get_calibrated_acc_metric(raw_val, params):
 def run_gpu_grid_search(acc_list, label_list, param_grid, device):
     num_samples = len(acc_list)
     if num_samples == 0:
-        return {"window": 10, "threshold": 0.4, "threshold2": 0.0, "frames": 8, "alpha": 0.1}, 0.0
+        return {
+            "window": 10,
+            "threshold": 0.4,
+            "threshold2": 0.0,
+            "frames": 8,
+            "alpha": 0.1,
+        }, 0.0
 
     max_len = max([len(a) for a in acc_list])
 
-    acc_tensor = torch.zeros((num_samples, max_len, 2), device=device, dtype=torch.float32)
+    acc_tensor = torch.zeros(
+        (num_samples, max_len, 2), device=device, dtype=torch.float32
+    )
     label_tensor = torch.tensor(label_list, device=device, dtype=torch.float32)
 
     for i, acc in enumerate(acc_list):
@@ -129,16 +139,22 @@ def run_gpu_grid_search(acc_list, label_list, param_grid, device):
     num_combos = len(combos)
 
     batch_size = num_samples * num_combos
-    
-    batch_acc = acc_tensor.unsqueeze(1).repeat(1, num_combos, 1, 1).view(batch_size, max_len, 2)
-    
+
+    batch_acc = (
+        acc_tensor.unsqueeze(1).repeat(1, num_combos, 1, 1).view(batch_size, max_len, 2)
+    )
+
     batch_thresh = combos_tensor[:, 0].repeat(num_samples).view(batch_size, 1)
     batch_frame_limit = combos_tensor[:, 1].repeat(num_samples).view(batch_size, 1)
     batch_alpha = combos_tensor[:, 2].repeat(num_samples).view(batch_size, 1)
-    
-    batch_labels = label_tensor.unsqueeze(1).repeat(1, num_combos, 1).view(batch_size, 2)
 
-    print(f"ZUPT Grid Search: Batch Size={batch_size}, Testing {len(windows)*len(thresholds2)*num_combos} combinations...")
+    batch_labels = (
+        label_tensor.unsqueeze(1).repeat(1, num_combos, 1).view(batch_size, 2)
+    )
+
+    print(
+        f"ZUPT Grid Search: Batch Size={batch_size}, Testing {len(windows)*len(thresholds2)*num_combos} combinations..."
+    )
 
     best_loss = float("inf")
     best_config = None
@@ -148,7 +164,9 @@ def run_gpu_grid_search(acc_list, label_list, param_grid, device):
     with tqdm(total=total_iterations, desc="Grid Search", unit="cfg") as pbar:
         for w_size in windows:
             for threshold2 in thresholds2:
-                batch_thresh2 = torch.tensor(threshold2, device=device, dtype=torch.float32).repeat(batch_size, 1)
+                batch_thresh2 = torch.tensor(
+                    threshold2, device=device, dtype=torch.float32
+                ).repeat(batch_size, 1)
 
                 vel = torch.zeros((batch_size, 2), device=device)
                 pos = torch.zeros((batch_size, 2), device=device)
@@ -157,7 +175,7 @@ def run_gpu_grid_search(acc_list, label_list, param_grid, device):
 
                 for t in range(max_len):
                     curr_acc = batch_acc[:, t, :]
-                    
+
                     start_idx = max(0, t - w_size + 1)
                     window_slice = batch_acc[:, start_idx : t + 1, :]
 
@@ -168,10 +186,14 @@ def run_gpu_grid_search(acc_list, label_list, param_grid, device):
                         std_val = torch.zeros((batch_size, 2), device=device)
                         mean_val = torch.zeros((batch_size, 2), device=device)
 
-                    is_stable = (std_val < batch_thresh) & (torch.abs(mean_val) < batch_thresh2 if threshold2 > 0 else True)
+                    is_stable = (std_val < batch_thresh) & (
+                        torch.abs(mean_val) < batch_thresh2 if threshold2 > 0 else True
+                    )
 
-                    static_counter = torch.where(is_stable, static_counter + 1, torch.zeros_like(static_counter))
-                    
+                    static_counter = torch.where(
+                        is_stable, static_counter + 1, torch.zeros_like(static_counter)
+                    )
+
                     is_static = static_counter >= batch_frame_limit
 
                     new_bias = (1 - batch_alpha) * bias + batch_alpha * curr_acc
@@ -179,15 +201,15 @@ def run_gpu_grid_search(acc_list, label_list, param_grid, device):
 
                     acc_real = curr_acc - bias
                     new_vel = vel + acc_real * dt
-                    
+
                     vel = torch.where(is_static, torch.zeros_like(vel), new_vel)
                     pos = pos + vel * dt
 
                 diff = (pos * 100) - batch_labels
                 dist = torch.sqrt(torch.sum(diff**2, dim=1))
-                
+
                 dist_matrix = dist.view(num_samples, num_combos)
-                
+
                 total_loss_per_combo = torch.sum(dist_matrix, dim=0)
 
                 min_w_loss, min_idx = torch.min(total_loss_per_combo, dim=0)
@@ -274,7 +296,7 @@ class SimpleRNN(nn.Module):
 
         # 強制使用 batch_first=True 以方便處理 shape
         # 雖然您的訓練 code 沒寫，但 inputs 通常是 (1, Seq, 2)
-        self.rnn = nn.RNN(
+        self.rnn = nn.GRU(
             input_size=input_size,
             hidden_size=hidden_size,
             num_layers=num_layers,
@@ -300,7 +322,7 @@ class SimpleRNN(nn.Module):
 # ==========================================
 
 
-def main_merged():
+def main_merged(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
@@ -323,10 +345,20 @@ def main_merged():
         "frames": [i for i in range(3, 4)],  # best 3
         "alpha": [0.01 * i for i in range(7, 8)],  # best 0.07
     }
-    best_params, min_err = run_gpu_grid_search(
-        acc_metric_list, labels_vec, param_grid, device
-    )
-    print(f"Best ZUPT Params: {best_params} (Loss: {min_err:.2f})")
+    if args.grid_search:
+        best_params, min_err = run_gpu_grid_search(
+            acc_metric_list, labels_vec, param_grid, device
+        )
+        print(f"Best ZUPT Params: {best_params} (Loss: {min_err:.2f})")
+    else:
+        best_params = {
+            "window": 12,
+            "threshold": 0.21,
+            "threshold2": 3,
+            "frames": 3,
+            "alpha": 0.07,
+        }
+        print(f"Use ZUPT Params: {best_params}")
 
     # 3. RNN 模型載入
     print("--- RNN Processing ---")
@@ -468,7 +500,7 @@ def main_merged():
 
     # --- 步驟 B: 開始繪圖 ---
     rows = len(plot_data)
-    fig = plt.figure(figsize=(18, 4 * rows))
+    fig = plt.figure(figsize=(18, 4 * rows), dpi=80)
     plt.subplots_adjust(hspace=0.4, wspace=0.25)
 
     for i in range(rows):
@@ -606,4 +638,8 @@ def main_merged():
 
 
 if __name__ == "__main__":
-    main_merged()
+    parser = argparse.ArgumentParser(description="Train SimpleRNN on custom dataset")
+    parser.add_argument("--grid_search", action="store_true", default=False)
+    args = parser.parse_args()
+    matplotlib.use("Agg")
+    main_merged(args)

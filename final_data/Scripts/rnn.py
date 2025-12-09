@@ -14,6 +14,8 @@ G = 1003.5581817562975
 
 DATA_FILE = "Datas/data.txt"
 LABEL_FILE = "Datas/label.txt"
+DATA_AUG_FILE = "Datas/data_reflection.txt"
+LABEL_AUG_FILE = "Datas/label_reflection.txt"
 REG_DATA_FILE = "Datas/reg_data.txt"
 REG_LABEL_FILE = "Datas/reg_label.txt"
 MASK_FILE = "Datas/mask.txt"
@@ -25,9 +27,13 @@ DEVICE = "cuda"
 
 
 class RNNDataset:
-    def __init__(self):
+    def __init__(self, use_reflection=False):
         self.data = self._load_file(DATA_FILE, maskfile=MASK_FILE)
+        if use_reflection:
+            self.data = self._load_file(DATA_AUG_FILE)
         self.label = self._load_label(LABEL_FILE, maskfile=MASK_FILE)
+        if use_reflection:
+            self.label = self._load_label(LABEL_AUG_FILE)
         self.reg_data = self._load_file(REG_DATA_FILE)
         self.reg_label = self._load_reglabel(REG_LABEL_FILE)
 
@@ -145,7 +151,7 @@ class SimpleRNN(nn.Module):
         self.num_layers = num_layers
 
         # You can replace nn.RNN with nn.GRU or nn.LSTM
-        self.rnn = nn.RNN(
+        self.rnn = nn.GRU(
             input_size=input_size,
             hidden_size=hidden_size,
             num_layers=num_layers,
@@ -165,10 +171,11 @@ class SimpleRNN(nn.Module):
 
 
 INTERVAL = 0.01
+BATCH_SIZE = 16
 
 
 def main(args):
-    dataset = RNNDataset()
+    dataset = RNNDataset(use_reflection=args.use_reflection)
     model = SimpleRNN(
         input_size=2, hidden_size=args.hidden_size, output_size=2, num_layers=args.layer
     ).to(DEVICE)
@@ -179,48 +186,61 @@ def main(args):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=0.01)
     N = len(dataset)
     M = len(dataset.reg_data)
+    shuffle = [i for i in range(N)]
     pbar = tqdm(range(args.epochs))
     print(N, M)
     loss_history = []
     for _ in pbar:
         model.train()
-        total_loss = 0.0
-        optimizer.zero_grad()
-        batch_loss = torch.zeros((1,), device=DEVICE)
-        reg_loss = torch.zeros((1,), device=DEVICE)
-        drift_loss = torch.zeros((1,), device=DEVICE)
-        for n in range(N):
-            x, y = dataset[n]
-            p = torch.tensor([0.0, 0.0], device=DEVICE)
-            L = len(x)
-            y_pred, _ = model(x)
-            for i in range(L):
-                p += y_pred[i] * INTERVAL
-                if i > 0:
-                    acc_drift = (y_pred[i] - y_pred[i - 1]) * model.alpha - (
-                        x[i] + x[i - 1]
-                    ) * INTERVAL / 2
-                    drift_loss += gelu(
-                        acc_drift[0] ** 2 + acc_drift[1] ** 2 - args.thresh
-                    )
-            batch_loss += criterion(p * model.alpha, y)
-        batch_loss /= N
-        drift_loss /= N
+        random.shuffle(shuffle)
+        epoch_train_loss, epoch_reg_loss, epoch_drift_loss = 0.0, 0.0, 0.0
+        for b in range(0, N, BATCH_SIZE):
+            optimizer.zero_grad()
+            train_loss = torch.zeros((1,), device=DEVICE)
+            reg_loss = torch.zeros((1,), device=DEVICE)
+            drift_loss = torch.zeros((1,), device=DEVICE)
+            for n in range(b, min(N, b + BATCH_SIZE)):
+                x, y = dataset[shuffle[n]]
+                p = torch.tensor([0.0, 0.0], device=DEVICE)
+                L = len(x)
+                y_pred, _ = model(x)
+                for i in range(L):
+                    p += y_pred[i] * INTERVAL
+                    if i > 0:
+                        acc_drift = (y_pred[i] - y_pred[i - 1]) - (
+                            x[i] + x[i - 1]
+                        ) * INTERVAL / 2
+                        drift_loss += gelu(
+                            acc_drift[0] ** 2 + acc_drift[1] ** 2 - args.thresh
+                        )
+                train_loss += criterion(p * model.alpha, y)
+            train_loss /= min(N, b + BATCH_SIZE) - b
+            drift_loss /= min(N, b + BATCH_SIZE) - b
 
-        for n in range(M):
-            x, y = dataset.reg_data[n], dataset.reg_label[n]
-            p = torch.tensor([0.0, 0.0], device=DEVICE)
-            L = len(x)
-            y_pred, _ = model(x)
-            y_pred *= model.alpha
-            reg_loss += criterion(y_pred, y) * INTERVAL
-        reg_loss /= M
-        total_loss = (
-            args.p_weight * batch_loss
-            + args.v_weight * reg_loss
-            + args.a_weight * drift_loss
+            for n in range(M):
+                x, y = dataset.reg_data[n], dataset.reg_label[n]
+                p = torch.tensor([0.0, 0.0], device=DEVICE)
+                L = len(x)
+                y_pred, _ = model(x)
+                y_pred *= model.alpha
+                reg_loss += criterion(y_pred, y) * INTERVAL
+            reg_loss /= M
+            total_loss = (
+                args.p_weight * train_loss
+                + args.v_weight * reg_loss
+                + args.a_weight * drift_loss
+            )
+            epoch_train_loss += (train_loss.item()) * (min(N, b + BATCH_SIZE) - b)
+            epoch_reg_loss += reg_loss.item()
+            epoch_drift_loss += (drift_loss.item()) * (min(N, b + BATCH_SIZE) - b)
+        epoch_train_loss /= N
+        epoch_drift_loss /= N
+        epoch_reg_loss /= (N + BATCH_SIZE - 1) // BATCH_SIZE
+        epoch_total_loss = (
+            args.p_weight * epoch_train_loss
+            + args.v_weight * epoch_reg_loss
+            + args.a_weight * epoch_drift_loss
         )
-        # total_loss = reg_loss
         loss_history.append(total_loss.item())
         if total_loss.item() == min(loss_history):
             torch.save(model.state_dict(), args.save_path)
@@ -228,9 +248,10 @@ def main(args):
         optimizer.step()
         pbar.set_postfix(
             {
-                "train_loss": f"{batch_loss.item():.3f}",
-                "reg_loss": f"{reg_loss.item():.3f}",
-                "drift_loss": f"{drift_loss.item():.3f}",
+                "train_loss": f"{epoch_train_loss:.2f}",
+                "reg_loss": f"{epoch_reg_loss:.2f}",
+                "drift_loss": f"{epoch_drift_loss:.2f}",
+                "total_loss": f"{epoch_total_loss:.2f}",
             }
         )
     print(f"Saved model params to {args.save_path}")
@@ -241,12 +262,13 @@ def parse():
     parser = argparse.ArgumentParser(description="Train SimpleRNN on custom dataset")
     parser.add_argument("--epochs", type=int, default=10000)
     parser.add_argument("--hidden_size", type=int, default=20)
-    parser.add_argument("--layer", type=int, default=2)
+    parser.add_argument("--layer", type=int, default=3)
     parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--thresh", type=float, default=1)
+    parser.add_argument("--thresh", type=float, default=5)
     parser.add_argument("--p_weight", type=float, default=1)
-    parser.add_argument("--v_weight", type=float, default=1)
+    parser.add_argument("--v_weight", type=float, default=0.1)
     parser.add_argument("--a_weight", type=float, default=1)
+    parser.add_argument("--use_reflection", action="store_true", default=False)
     parser.add_argument(
         "--save_path",
         type=str,
