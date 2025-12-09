@@ -1,7 +1,8 @@
-#include "rnn.h"
+#include "main.h"
+
+#if defined(RNN) || defined(RNN_DSP)
 
 #include "math.h"
-#include "arm_math.h"
 
 /*  the following variables should not be able to access beyond this scope */
 const float rnn_alpha = 4.0104;	 // alpha is used to make rnn able to convert
@@ -326,17 +327,19 @@ static inline float tanh_c3(float v)
     return (v3 + v4) / (v3 - v4);
 }
 
+#ifdef RNN_DSP
+
 static arm_matrix_instance_f32 mat_hh[LAYER_NUM] = {
-    {HIDDEN_SIZE, HIDDEN_SIZE, (float*)weight_hh[0]},
-    {HIDDEN_SIZE, HIDDEN_SIZE, (float*)weight_hh[1]},
+    {HIDDEN_SIZE, HIDDEN_SIZE, (float *) weight_hh[0]},
+    {HIDDEN_SIZE, HIDDEN_SIZE, (float *) weight_hh[1]},
 };
 
 static arm_matrix_instance_f32 mat_ih[LAYER_NUM - 1] = {
-    {HIDDEN_SIZE, HIDDEN_SIZE, (float*)weight_ih_layers[0]},
+    {HIDDEN_SIZE, HIDDEN_SIZE, (float *) weight_ih_layers[0]},
 };
 
 static arm_matrix_instance_f32 mat_out = {
-	2, HIDDEN_SIZE, (float*)weight_output
+	2, HIDDEN_SIZE, (float *) weight_output
 };
 
 static float mat_buf[HIDDEN_SIZE];
@@ -384,7 +387,7 @@ void rnn_dsp(
 		arm_mat_init_f32(&ih, HIDDEN_SIZE, 1, (float *) hidden_next[l - 1]);
 
 		// bias = bias_hh + bias_ih
-		arm_add_f32((float*)bias_hh[l], (float*)bias_ih[l], hidden_next[l], HIDDEN_SIZE);
+		arm_add_f32((float *) bias_hh[l], (float *) bias_ih[l], hidden_next[l], HIDDEN_SIZE);
 		
 		// W_hh[l] \cdot h[l]
 		arm_mat_mult_f32(&mat_hh[l], &hh, &buf);
@@ -419,6 +422,10 @@ void rnn_dsp(
     output[0] += out_buf[0], output[1] += out_buf[1];
 }
 
+#endif
+
+#ifdef RNN
+
 void rnn(
 	float ax, float ay, float hidden[LAYER_NUM][HIDDEN_SIZE], float output[2],
 	float hidden_next[LAYER_NUM][HIDDEN_SIZE]
@@ -451,3 +458,6 @@ void rnn(
 		output[1] += weight_output[1][i] * hidden_next[LAYER_NUM - 1][i];
 	}
 }
+
+#endif
+#endif

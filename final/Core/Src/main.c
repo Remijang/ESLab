@@ -24,8 +24,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "arm_math.h"
-#include "rnn.h"
 #include "stdio.h"
 #include "usbd_hid.h"
 /* USER CODE END Includes */
@@ -38,7 +36,6 @@
 /* USER CODE BEGIN PD */
 #define timerDelay 300U
 #define NUM_SAMPLE 18
-
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -77,6 +74,8 @@ uint32_t freq = 100;
 
 extern USBD_HandleTypeDef hUsbDeviceFS;
 extern const float rnn_alpha;
+
+#ifdef HEURISTIC
 
 float32_t DtD_data[36];
 float32_t Dt1_data[6];
@@ -133,6 +132,8 @@ int clamp_x, clamp_y;
 char final_x, final_y;
 float res_x = 0.0, res_y = 0.0;
 float px2 = 0.0, py2 = 0.0;
+
+#endif
 
 /* USER CODE END PV */
 
@@ -197,8 +198,11 @@ int main(void) {
 	/* Init scheduler */
 	osKernelInitialize();
 
-	//tid_send = osThreadNew(Task_Send, NULL, &TaskSend_attributes);
+#ifdef HEURISTIC
+	tid_send = osThreadNew(Task_Send, NULL, &TaskSend_attributes);
+#elif defined(RNN) || defined(RNN_DSP) || defined(RNN_DSP_Q15)
 	tid_send_rnn = osThreadNew(Task_Send_RNN, NULL, &TaskSendRNN_attributes);
+#endif
 
 	/* USER CODE BEGIN RTOS_EVENTS */
 	/* add events, ... */
@@ -706,6 +710,8 @@ void ACC_InitGPIO(void) {
 	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
+#ifdef HEURISTIC
+
 void Calibration_Init() {
 	arm_mat_init_f32(&DtD, 6, 6, DtD_data);
 	arm_mat_init_f32(&Dt1, 6, 1, Dt1_data);
@@ -905,6 +911,10 @@ void Task_Send(void *argument) {
 	}
 }
 
+#endif
+
+#if defined(RNN) || defined(RNN_DSP) || defined(RNN_DSP_Q15)
+
 void Task_Send_RNN(void *argument) {
 	MX_USB_DEVICE_Init();
 	// Calibration();
@@ -920,7 +930,13 @@ void Task_Send_RNN(void *argument) {
 	};
 
 	const float interval = 0.01;
+
+#if defined(RNN) || defined(RNN_DSP)
 	float hidden[2][LAYER_NUM][HIDDEN_SIZE] = {{{0.0}}};
+#elif defined(RNN_DSP_Q15)
+	q15_t hidden[2][LAYER_NUM][HIDDEN_SIZE] = {{{0.0}}};
+#endif
+
 	int t = 0;
 	float output[2] = {0.0};
 	float scale = 16;
@@ -938,7 +954,13 @@ void Task_Send_RNN(void *argument) {
 		float ax = (data[1] - E) / B;
 		float ay = -(data[0] - D) / A;
 
+#if defined(RNN)
+		rnn(ax, ay, hidden[t], output, hidden[t ^ 1]);
+#elif defined(RNN_DSP)
 		rnn_dsp(ax, ay, hidden[t], output, hidden[t ^ 1]);
+#elif defined(RNN_DSP_Q15)
+		rnn_dsp_q15(ax, ay, hidden[t], output, hidden[t ^ 1]);
+#endif
 		t ^= 1;
 
 		float vx = output[0];
@@ -977,6 +999,8 @@ void Task_Send_RNN(void *argument) {
 		osDelayUntil(deadline);
 	}
 }
+
+#endif
 
 /* USER CODE END 4 */
 

@@ -32,6 +32,9 @@ extern "C" {
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stm32l475e_iot01_accelero.h"
+
+#include "rnn.h"
+#include "arm_math.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -43,6 +46,11 @@ typedef struct {
 	char padding;
 } report_t;
 /* USER CODE END ET */
+
+// #define RNN
+// #define RNN_DSP
+#define RNN_DSP_Q15
+// #define HEURISTIC
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
