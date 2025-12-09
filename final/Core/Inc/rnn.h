@@ -2,7 +2,7 @@
 #define __RNN_H__
 
 #define HIDDEN_SIZE 20
-#define LAYER_NUM 2
+#define LAYER_NUM 3
 
 #include "arm_math.h"
 

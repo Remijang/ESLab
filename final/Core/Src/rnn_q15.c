@@ -257,105 +257,68 @@ void tanh_q15(q15_t * data, uint16_t size, uint16_t int_width)
 
 }
 
-static arm_matrix_instance_q15 mat_hh[LAYER_NUM] = {
-    {HIDDEN_SIZE, HIDDEN_SIZE, (q15_t *) weight_hh[0]},
-    {HIDDEN_SIZE, HIDDEN_SIZE, (q15_t *) weight_hh[1]},
-};
-
-static arm_matrix_instance_q15 mat_ih[LAYER_NUM - 1] = {
-    {HIDDEN_SIZE, HIDDEN_SIZE, (q15_t *) weight_ih_layers[0]},
-};
-
-static arm_matrix_instance_q15 mat_out = {
-	2, HIDDEN_SIZE, (q15_t *) weight_output
-};
-
-static q15_t mat_buf[HIDDEN_SIZE];
-static q15_t mat_buf_hh[HIDDEN_SIZE];
-static q15_t mat_buf_ih[HIDDEN_SIZE];
-static q15_t mat_imm[HIDDEN_SIZE];
-static q15_t out_buf[2];
-
-static arm_matrix_instance_q15 hh;
-static arm_matrix_instance_q15 ih;
-static arm_matrix_instance_q15 oh;
-static arm_matrix_instance_q15 buf;
-static arm_matrix_instance_q15 buf_hh = {
-    HIDDEN_SIZE, 1, (q15_t *) mat_buf_hh
-};
-static arm_matrix_instance_q15 buf_ih = {
-    HIDDEN_SIZE, 1, (q15_t *) mat_buf_ih
-};
-
 void rnn_dsp_q15(
     float ax, float ay, 
     q15_t hidden[LAYER_NUM][HIDDEN_SIZE], 
     float output[2],
     q15_t hidden_next[LAYER_NUM][HIDDEN_SIZE]
 ) {
-    // hh = h[0]
-    arm_mat_init_q15(&hh,  HIDDEN_SIZE, 1, (q15_t *) hidden[0]);
-
-    // buf = mat_buf
-    arm_mat_init_q15(&buf, HIDDEN_SIZE, 1, (q15_t *) mat_buf);
-    
-    // mat_buf = W_hh[0] \cdot h[0]
-    arm_mat_mult_q15(&mat_hh[0], &hh, &buf, mat_imm);
+    q63_t dot_result;
+    float dot_result_float;
 
     for (int i = 0; i < HIDDEN_SIZE; ++i) {
         // Win \cdot x (dequantized)
         float acc = ((float) weight_ih[i][0] * ax + (float) weight_ih[i][1] * ay) * s_w_ih;
-        
+
         // bias = bias_hh (dequantized) + bias_ih (dequantized)
         acc += ((float) bias_hh[0][i] * s_b_hh) + ((float) bias_ih[0][i] * s_b_ih);
+        
+        // W_hh[0] \cdot h[0]
+        arm_dot_prod_q15((q15_t *) weight_hh[0][i], (q15_t *) hidden[0], HIDDEN_SIZE, &dot_result);
+        dot_result_float = ((float) dot_result) / 1073741824.0f;
 
         // acc = W_in \cdot x + W_hh[0] \cdot h[0] (dequantized) + bias
-        acc += (float) mat_buf[i] / s_w_hh;
+        acc += dot_result_float * s_w_hh;
 
         // h_next[l] = tanh(acc)
-        hidden_next[0][i] = clip_q15(tanh_c3(acc));
+        hidden_next[0][i] = clip_q15(tanh_c3(acc)) * 32768;
     }
 
 
     for (int l = 1; l < LAYER_NUM; ++l) {
-        // hh = hidden[l]
-        arm_mat_init_q15(&hh,  HIDDEN_SIZE, 1, hidden[l]);
-
-        // mat_buf_hh = W_hh[l] \cdot h[0]
-        arm_mat_mult_q15(&mat_hh[l], &hh, &buf_hh, mat_imm);
-
-        // ih = hidden_next[l - 1]
-        arm_mat_init_q15(&ih,  HIDDEN_SIZE, 1, hidden_next[l - 1]);
-        
-        // mat_buf_ih = W_ih[l - 1] \cdot h_next[l - 1]
-        arm_mat_mult_q15(&mat_ih[l - 1], &ih, &buf_ih, mat_imm);
-
         for (int i = 0; i < HIDDEN_SIZE; ++i) {
             // bias = bias_hh (dequantized) + bias_ih (dequantized)
             float acc = (bias_hh[l][i] * s_b_hh) + (bias_ih[l][i] * s_b_ih);
+            
+            // W_hh[l] \cdot h[l]
+            arm_dot_prod_q15((q15_t *) weight_hh[l][i], (q15_t *) hidden[l], HIDDEN_SIZE, &dot_result);
+            dot_result_float = ((float) dot_result) / 1073741824.0f;
 
+            // acc = W_hh[l] \cdot h[l] + bias
+            acc += dot_result_float * s_w_hh;
+            
+            // W_hh[l] \cdot h[l]
+            arm_dot_prod_q15((q15_t *) weight_ih_layers[l - 1][i], (q15_t *) hidden_next[l - 1], HIDDEN_SIZE, &dot_result);
+            dot_result_float = ((float) dot_result) / 1073741824.0f;
+            
             // acc = W_hh[l] \cdot h[l] + W_ih[l - 1] \cdot h_next[l - 1] + bias
-            acc += (float) mat_buf_hh[i] * s_w_hh + (float) mat_buf_ih[i] * s_w_ih_layers;
+            acc += dot_result_float * s_w_ih_layers;
 
             // h_next[l] = tanh(acc)
-            hidden_next[l][i] = clip_q15(tanh_c3(acc));
+            hidden_next[l][i] = clip_q15(tanh_c3(acc)) * 32768;
         }
     }
-    // oh = hidden_next[L - 1]
-    arm_mat_init_q15(&oh,  HIDDEN_SIZE, 1, hidden_next[LAYER_NUM - 1]);
-
-    // buf = out_buf
-    arm_mat_init_q15(&buf, 2, 1, out_buf);
-
-    // W_out \cdot h_next[L - 1]
-    arm_mat_mult_q15(&mat_out, &oh, &buf, mat_imm);
 
     for(int i = 0; i < 2; i++) {
         // bias = bias_output (dequantized)
         float bias = (float) bias_output[i] * s_o_b;
 
+        // W_out \cdot h_next[LAYER_NUM - 1]
+        arm_dot_prod_q15((q15_t *) weight_output[i], (q15_t *) hidden_next[LAYER_NUM - 1], HIDDEN_SIZE, &dot_result);
+        dot_result_float = ((float) dot_result) / 1073741824.0f;
+
         // output = W_out \cdot h_next[L - 1] + bias
-        output[i] = (float) out_buf[i] * s_o_w + bias;
+        output[i] = dot_result_float * s_o_w + bias;
     }
 }
 
