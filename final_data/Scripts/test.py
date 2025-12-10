@@ -111,8 +111,8 @@ def run_gpu_grid_search(acc_list, label_list, param_grid, device):
     if num_samples == 0:
         return {
             "window": 10,
-            "threshold": 0.4,
-            "threshold2": 0.0,
+            "mv_threshold": 0.4,
+            "mag_threshold": 0.2,
             "frames": 8,
             "alpha": 0.1,
         }, 0.0
@@ -129,12 +129,12 @@ def run_gpu_grid_search(acc_list, label_list, param_grid, device):
         acc_tensor[i, :L, :] = torch.tensor(acc, device=device, dtype=torch.float32)
 
     windows = param_grid["window"]
-    thresholds = param_grid["threshold"]
-    thresholds2 = param_grid["threshold2"]
+    mv_thresholds = param_grid["threshold"]
+    mag_thresholds = param_grid["threshold2"]
     frames_list = param_grid["frames"]
     alphas = param_grid["alpha"]
 
-    combos = list(itertools.product(thresholds, frames_list, alphas))
+    combos = list(itertools.product(mv_thresholds, frames_list, alphas))
     combos_tensor = torch.tensor(combos, device=device, dtype=torch.float32)
     num_combos = len(combos)
 
@@ -144,7 +144,7 @@ def run_gpu_grid_search(acc_list, label_list, param_grid, device):
         acc_tensor.unsqueeze(1).repeat(1, num_combos, 1, 1).view(batch_size, max_len, 2)
     )
 
-    batch_thresh = combos_tensor[:, 0].repeat(num_samples).view(batch_size, 1)
+    batch_thresh_mv = combos_tensor[:, 0].repeat(num_samples).view(batch_size, 1)
     batch_frame_limit = combos_tensor[:, 1].repeat(num_samples).view(batch_size, 1)
     batch_alpha = combos_tensor[:, 2].repeat(num_samples).view(batch_size, 1)
 
@@ -153,19 +153,21 @@ def run_gpu_grid_search(acc_list, label_list, param_grid, device):
     )
 
     print(
-        f"ZUPT Grid Search: Batch Size={batch_size}, Testing {len(windows)*len(thresholds2)*num_combos} combinations..."
+        f"ZUPT Grid Search: Batch Size={batch_size}, Testing {len(windows)*len(mag_thresholds)*num_combos} combinations..."
     )
 
     best_loss = float("inf")
     best_config = None
     dt = 0.01
 
-    total_iterations = len(windows) * len(thresholds2)
+    total_iterations = len(windows) * len(mag_thresholds)
+    
     with tqdm(total=total_iterations, desc="Grid Search", unit="cfg") as pbar:
         for w_size in windows:
-            for threshold2 in thresholds2:
-                batch_thresh2 = torch.tensor(
-                    threshold2, device=device, dtype=torch.float32
+            for mag_thresh in mag_thresholds:
+                # 設定當前的 MAG 閾值 Tensor
+                batch_thresh_mag = torch.tensor(
+                    mag_thresh, device=device, dtype=torch.float32
                 ).repeat(batch_size, 1)
 
                 vel = torch.zeros((batch_size, 2), device=device)
@@ -184,12 +186,16 @@ def run_gpu_grid_search(acc_list, label_list, param_grid, device):
                         mean_val = torch.mean(window_slice, dim=1)
                     else:
                         std_val = torch.zeros((batch_size, 2), device=device)
-                        mean_val = torch.zeros((batch_size, 2), device=device)
+                        mean_val = curr_acc
 
-                    is_stable = (std_val < batch_thresh) & (
-                        torch.abs(mean_val) < batch_thresh2 if threshold2 > 0 else True
-                    )
+                    cond_mv = std_val < batch_thresh_mv
+                    
+                    if mag_thresh > 0:
+                        cond_mag = torch.abs(mean_val) < batch_thresh_mag
+                    else:
+                        cond_mag = torch.ones_like(cond_mv, dtype=torch.bool)
 
+                    is_stable = cond_mv & cond_mag 
                     static_counter = torch.where(
                         is_stable, static_counter + 1, torch.zeros_like(static_counter)
                     )
@@ -209,9 +215,7 @@ def run_gpu_grid_search(acc_list, label_list, param_grid, device):
                 dist = torch.sqrt(torch.sum(diff**2, dim=1))
 
                 dist_matrix = dist.view(num_samples, num_combos)
-
                 total_loss_per_combo = torch.sum(dist_matrix, dim=0)
-
                 min_w_loss, min_idx = torch.min(total_loss_per_combo, dim=0)
 
                 if min_w_loss.item() < best_loss:
@@ -220,7 +224,7 @@ def run_gpu_grid_search(acc_list, label_list, param_grid, device):
                     best_config = {
                         "window": w_size,
                         "threshold": best_c[0].item(),
-                        "threshold2": threshold2.item(),
+                        "threshold2": mag_thresh,
                         "frames": int(best_c[1]),
                         "alpha": best_c[2],
                     }
@@ -234,8 +238,8 @@ def run_gpu_grid_search(acc_list, label_list, param_grid, device):
 class FinalZUPT:
     def __init__(self, params):
         self.w = params["window"]
-        self.th = params["threshold"]
-        self.th2 = params["threshold2"]
+        self.mv_th = params["threshold"]
+        self.mag_th = params["threshold2"]
         self.fr = params["frames"]
         self.alpha = params["alpha"]
         self.vx, self.vy = 0.0, 0.0
@@ -250,7 +254,10 @@ class FinalZUPT:
         self.buff_y.append(ay)
         sx = False
         if len(self.buff_x) == self.w:
-            if np.std(self.buff_x) < self.th and np.mean(self.buff_x) < self.th2:
+            curr_std = np.std(self.buff_x)
+            curr_mag = np.abs(np.mean(self.buff_x))
+            
+            if curr_std < self.mv_th and curr_mag < self.mag_th:
                 self.cx += 1
             else:
                 self.cx = 0
@@ -266,7 +273,10 @@ class FinalZUPT:
 
         sy = False
         if len(self.buff_y) == self.w:
-            if np.std(self.buff_y) < self.th and np.mean(self.buff_y) < self.th2:
+            curr_std = np.std(self.buff_y)
+            curr_mag = np.abs(np.mean(self.buff_y))
+            
+            if curr_std < self.mv_th and curr_mag < self.mag_th:
                 self.cy += 1
             else:
                 self.cy = 0
@@ -339,11 +349,11 @@ def main_merged(args):
     print("--- ZUPT Processing ---")
     acc_metric_list = [get_calibrated_acc_metric(d, params_file) for d in dataset_raw]
     param_grid = {
-        "window": [i for i in range(10, 11)],  # best 10
-        "threshold": np.arange(0.2, 0.21, 0.01),  # best 0.2
-        "threshold2": np.arange(0.6, 0.7, 0.1),  # best 0.6
-        "frames": [i for i in range(3, 4)],  # best 3
-        "alpha": [0.01 * i for i in range(7, 8)],  # best 0.07
+        "window": [i for i in range(3, 15)],  # best 10
+        "threshold": np.arange(0.11, 1.01, 0.05),  # best 0.2
+        "threshold2": np.arange(0.0, 5, 0.05),  # best 0.6
+        "frames": [i for i in range(3, 12, 2)],  # best 3
+        "alpha": [0.01 * i for i in range(1, 21)],  # best 0.07
     }
     if args.grid_search:
         best_params, min_err = run_gpu_grid_search(

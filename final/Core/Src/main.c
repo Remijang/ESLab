@@ -105,10 +105,11 @@ typedef struct {
 SensorCal_t cal_data;
 
 // hyperparameters
-int window = 12;
-float threshold = 0.21 * 0.21;
+int window = 8;
+float threshold = 0.16 * 0.16;
+float threshold2 = 1.6;
 int frames = 3;
-float alpha = 0.07;
+float alpha = 0.15;
 
 // variables
 float ax = 0.0, ay = 0.0;
@@ -121,8 +122,8 @@ int count = 0;
 
 // helpers
 float pre_ax = 0.0, pre_ay = 0.0;
-float sum_x = 0.0, sum_x2 = 0.0, ex = 0.0, ex2 = 0.0;
-float sum_y = 0.0, sum_y2 = 0.0, ey = 0.0, ey2 = 0.0;
+float sum_x = 0.0, sum_x2 = 0.0, ex = 0.0, ex2 = 0.0, abs_ex = 0.0;
+float sum_y = 0.0, sum_y2 = 0.0, ey = 0.0, ey2 = 0.0, abs_ey = 0.0;
 float var_x = 0.0, var_y = 0.0;
 
 // numeric
@@ -844,12 +845,14 @@ void Task_Send(void *argument) {
 
 		var_x = ex2 - ex * ex;
 		var_y = ey2 - ey * ey;
+		abs_ex = ex >= 0.0 ? ex : -ex;
+		abs_ey = ey >= 0.0 ? ey : -ey;
 
 		++count;
 
 		// x
 		if (count >= window) {
-			if (var_x < threshold)
+			if (var_x < threshold && abs_ex < threshold2)
 				cx += 1;
 			else
 				cx = 0;
@@ -865,7 +868,7 @@ void Task_Send(void *argument) {
 
 		// y
 		if (count >= window) {
-			if (var_y < threshold)
+			if (var_y < threshold && abs_ey < threshold2)
 				cy += 1;
 			else
 				cy = 0;
