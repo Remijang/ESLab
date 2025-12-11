@@ -171,6 +171,7 @@ def run_gpu_grid_search(acc_list, label_list, param_grid, device):
                 ).repeat(batch_size, 1)
 
                 vel = torch.zeros((batch_size, 2), device=device)
+                prev_vel = torch.zeros((batch_size, 2), device=device)
                 pos = torch.zeros((batch_size, 2), device=device)
                 bias = torch.zeros((batch_size, 2), device=device)
                 static_counter = torch.zeros((batch_size, 2), device=device)
@@ -209,7 +210,8 @@ def run_gpu_grid_search(acc_list, label_list, param_grid, device):
                     new_vel = vel + acc_real * dt
 
                     vel = torch.where(is_static, torch.zeros_like(vel), new_vel)
-                    pos = pos + vel * dt
+                    pos = pos + (vel + prev_vel) * dt / 2
+                    prev_vel = vel
 
                 diff = (pos * 100) - batch_labels
                 dist = torch.sqrt(torch.sum(diff**2, dim=1))
@@ -243,6 +245,7 @@ class FinalZUPT:
         self.fr = params["frames"]
         self.alpha = params["alpha"]
         self.vx, self.vy = 0.0, 0.0
+        self.prev_vx, self.prev_vy = 0.0, 0.0
         self.px, self.py = 0.0, 0.0
         self.bx, self.by = 0.0, 0.0
         self.buff_x = deque(maxlen=self.w)
@@ -266,10 +269,12 @@ class FinalZUPT:
         if self.cx >= self.fr:
             sx = True
             self.vx = 0.0
+            self.prev_vx = 0.0
             self.bx = (1 - self.alpha) * self.bx + self.alpha * ax
         else:
             self.vx += (ax - self.bx) * dt
-            self.px += self.vx * dt
+            self.px += (self.vx + self.prev_vx) * dt / 2
+            self.prev_vx = self.vx
 
         sy = False
         if len(self.buff_y) == self.w:
@@ -285,10 +290,12 @@ class FinalZUPT:
         if self.cy >= self.fr:
             sy = True
             self.vy = 0.0
+            self.prev_vy = 0.0
             self.by = (1 - self.alpha) * self.by + self.alpha * ay
         else:
             self.vy += (ay - self.by) * dt
-            self.py += self.vy * dt
+            self.py += (self.vy +self.prev_vy) * dt / 2
+            self.prev_vy = self.vy
         return [self.px * 100, self.py * 100], [self.vx * 100, self.vy * 100], [sx, sy]
 
 

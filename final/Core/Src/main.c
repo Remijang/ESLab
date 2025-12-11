@@ -114,6 +114,7 @@ float alpha = 0.15;
 // variables
 float ax = 0.0, ay = 0.0;
 float vx = 0.0, vy = 0.0;
+float prev_vx = 0.0, prev_vy = 0.0;
 float px = 0.0, py = 0.0;
 float bx = 0.0, by = 0.0;
 int ptr_x = 0, ptr_y = 0;
@@ -859,11 +860,12 @@ void Task_Send(void *argument) {
 		} else
 			cx += 1;
 		if (cx >= frames) {
-			vx = 0.0;
+			vx = prev_vx = 0.0;
 			bx = (1 - alpha) * bx + alpha * ax;
 		} else {
 			vx += (ax - bx) * dt;
-			px += vx * dt;
+			px += (vx + prev_vx) * dt / 2;
+			prev_vx = vx;
 		}
 
 		// y
@@ -875,11 +877,12 @@ void Task_Send(void *argument) {
 		} else
 			cy += 1;
 		if (cy >= frames) {
-			vy = 0.0;
+			vy = prev_vy = 0.0;
 			by = (1 - alpha) * by + alpha * ay;
 		} else {
 			vy += (ay - by) * dt;
-			py += vy * dt;
+			py += (vy + prev_vy) * dt / 2;
+			prev_vy = vy;
 		}
 
 		// calculate theoritical velocity
