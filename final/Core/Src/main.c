@@ -75,7 +75,7 @@ uint32_t freq = 100;
 extern USBD_HandleTypeDef hUsbDeviceFS;
 extern const float rnn_alpha;
 
-#if defined(HEURISTIC) || defined(HEURISTIC_ONE_EURO)
+#if defined(HEURISTIC) || defined(HEURISTIC_ONE_EURO) || defined(HEURISTIC_KALMAN)
 
 float32_t DtD_data[36];
 float32_t Dt1_data[6];
@@ -114,6 +114,7 @@ float alpha = 0.15;
 // variables
 float ax = 0.0, ay = 0.0;
 float vx = 0.0, vy = 0.0;
+float prev_vx = 0.0, prev_vy = 0.0;
 float px = 0.0, py = 0.0;
 float bx = 0.0, by = 0.0;
 int ptr_x = 0, ptr_y = 0;
@@ -139,9 +140,9 @@ float px2 = 0.0, py2 = 0.0;
 		#define OE_MIN_CUTOFF 1.0f
 		#define OE_BETA 0.08f
 
-		#define FRICTION 0.95f
-		#define SCALE_BASE 4.0f
-		#define SCALE_ACCEL 0.3f
+		#define FRICTION 0.99f
+		#define SCALE_BASE 40.0f
+		#define SCALE_ACCEL 3.0f
 
 typedef struct {
 	float prev_x;
@@ -149,6 +150,21 @@ typedef struct {
 	float prev_raw;
 } one_euro_t;
 
+	#endif
+
+	#if defined(HEURISTIC_KALMAN)
+		#define KF_R_BASE 0.05f
+		#define KF_Q 0.001f 
+
+		#define FRICTION 0.99f
+		#define SCALE_BASE 40.0f
+		#define SCALE_ACCEL 3.0f
+
+typedef struct {
+    float x;
+    float P;
+    float K;
+} kalman_t;
 	#endif
 
 #endif
@@ -216,7 +232,7 @@ int main(void) {
 	/* Init scheduler */
 	osKernelInitialize();
 
-#ifdef HEURISTIC
+#if defined(HEURISTIC) || defined(HEURISTIC_ONE_EURO) || defined(HEURISTIC_KALMAN)
 	tid_send = osThreadNew(Task_Send, NULL, &TaskSend_attributes);
 #else
 	tid_send_rnn = osThreadNew(Task_Send_RNN, NULL, &TaskSendRNN_attributes);
@@ -728,7 +744,7 @@ void ACC_InitGPIO(void) {
 	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
-#ifdef HEURISTIC
+#ifdef defined(HEURISTIC) || defined(HEURISTIC_ONE_EURO) || defined(HEURISTIC_KALMAN)
 
 void Calibration_Init() {
 	arm_mat_init_f32(&DtD, 6, 6, DtD_data);
@@ -825,6 +841,26 @@ float one_euro_update(one_euro_t *state, float raw, float dt) {
 }
 	#endif
 
+	#if defined(HEURISTIC_KALMAN)
+float kalman_update(kalman_t *k, float measurement) {
+    float x_pred = k->x;
+    float P_pred = k->P + KF_Q;
+
+    float innovation = measurement - x_pred;
+    
+    float dynamic_R = KF_R_BASE;
+    if (fabsf(innovation) > 0.5f) {
+        dynamic_R = KF_R_BASE / 10.0f;
+    }
+
+    k->K = P_pred / (P_pred + dynamic_R);
+    k->x = x_pred + k->K * innovation;
+    k->P = (1.0f - k->K) * P_pred;
+
+    return k->x;
+}
+	#endif
+
 void Task_Send(void *argument) {
 	MX_USB_DEVICE_Init();
 	Calibration();
@@ -859,10 +895,38 @@ void Task_Send(void *argument) {
 	float init_x = (pDataXYZ[0] + cal_data.offset[0]) * cal_data.gain[0];
 	float init_y = (pDataXYZ[1] + cal_data.offset[1]) * cal_data.gain[1];
 
+	#if defined(remijang)
 	oe_x.prev_x = oe_x.prev_raw = init_y;
 	oe_y.prev_x = oe_y.prev_raw = -init_x;
 	bx = init_y;
 	by = -init_x;
+	#else
+	oe_x.prev_x = oe_x.prev_raw = init_y;
+	oe_y.prev_x = oe_y.prev_raw = init_x;
+	bx = init_y;
+	by = init_x;
+	#endif
+
+	#elif defined(HEURISTIC_KALMAN)
+	// filters
+	kalman_t kf_x = {0, 1.0f, 0};
+    kalman_t kf_y = {0, 1.0f, 0};
+
+    BSP_ACCELERO_AccGetXYZ(pDataXYZ);
+    float init_x = (pDataXYZ[0] + cal_data.offset[0]) * cal_data.gain[0];
+    float init_y = (pDataXYZ[1] + cal_data.offset[1]) * cal_data.gain[1];
+
+	#if defined(remijang)
+    kf_x.x = init_y; 
+    kf_y.x = -init_x;
+    bx = init_y;
+    by = -init_x;
+	#else
+    kf_x.x = init_y; 
+    kf_y.x = init_x;
+    bx = init_y;
+    by = init_x;
+	#endif
 	#endif
 
 	for (;;) {
@@ -878,11 +942,26 @@ void Task_Send(void *argument) {
 			data[i] += cal_data.offset[i];
 			data[i] *= cal_data.gain[i];
 		}
+	#if defined(remijang)
 	#if defined(HEURISTIC)
 		ax = data[1], ay = -data[0];
 	#elif defined(HEURISTIC_ONE_EURO)
 		float ax = one_euro_update(&oe_x, data[1], dt);
 		float ay = one_euro_update(&oe_y, -data[0], dt);
+	#elif defined(HEURISTIC_KALMAN)
+		float ax = kalman_update(&kf_x, raw_y);
+        float ay = kalman_update(&kf_y, -raw_x);
+	#endif
+	#else
+	#if defined(HEURISTIC)
+		ax = data[1], ay = data[0];
+	#elif defined(HEURISTIC_ONE_EURO)
+		float ax = one_euro_update(&oe_x, data[1], dt);
+		float ay = one_euro_update(&oe_y, data[0], dt);
+	#elif defined(HEURISTIC_KALMAN)
+		float ax = kalman_update(&kf_x, raw_y);
+        float ay = kalman_update(&kf_y, raw_x);
+	#endif
 	#endif
 
 		buff_x[ptr_x] = ax, buff_y[ptr_y] = ay;
@@ -947,7 +1026,7 @@ void Task_Send(void *argument) {
 		// calculate theoritical velocity
 		float target_x = vx * scale + res_x;
 		float target_y = vy * scale + res_y;
-	#elif defined(HEURISTIC_ONE_EURO)
+	#elif defined(HEURISTIC_ONE_EURO) || defined(HEURISTIC_KALMAN)
 		// friction
 		if (cx < frames)
 			vx *= FRICTION;
