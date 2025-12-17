@@ -49,8 +49,9 @@ typedef struct {
 
 // #define RNN
 // #define RNN_DSP
-#define RNN_DSP_Q15
+// #define RNN_DSP_Q15
 // #define HEURISTIC
+#define HEURISTIC_ONE_EURO
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */

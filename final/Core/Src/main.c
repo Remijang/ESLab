@@ -75,7 +75,7 @@ uint32_t freq = 100;
 extern USBD_HandleTypeDef hUsbDeviceFS;
 extern const float rnn_alpha;
 
-#ifdef HEURISTIC
+#if defined(HEURISTIC) || defined(HEURISTIC_ONE_EURO)
 
 float32_t DtD_data[36];
 float32_t Dt1_data[6];
@@ -114,7 +114,6 @@ float alpha = 0.15;
 // variables
 float ax = 0.0, ay = 0.0;
 float vx = 0.0, vy = 0.0;
-float prev_vx = 0.0, prev_vy = 0.0;
 float px = 0.0, py = 0.0;
 float bx = 0.0, by = 0.0;
 int ptr_x = 0, ptr_y = 0;
@@ -134,6 +133,23 @@ int clamp_x, clamp_y;
 char final_x, final_y;
 float res_x = 0.0, res_y = 0.0;
 float px2 = 0.0, py2 = 0.0;
+
+#if defined(HEURISTIC_ONE_EURO)
+// filter
+#define OE_MIN_CUTOFF 1.0f
+#define OE_BETA       0.08f
+
+#define FRICTION      0.95f
+#define SCALE_BASE    4.0f
+#define SCALE_ACCEL   0.3f
+
+typedef struct {
+    float prev_x;
+    float prev_dx;
+    float prev_raw;
+} one_euro_t;
+
+#endif
 
 #endif
 
@@ -790,6 +806,24 @@ void Calibration() {
 	}
 }
 
+#if defined(HEURISTIC_ONE_EURO)
+float one_euro_update(one_euro_t *state, float raw, float dt) {
+    float dx = (raw - state->prev_raw) / dt;
+    
+    float edx = fabsf(dx);
+    float cutoff = OE_MIN_CUTOFF + OE_BETA * edx;
+    
+    float tau = 1.0f / (2.0f * 3.14159f * cutoff); // time const = 1 / w = 1 / (2 pi freq)
+    float alpha = dt / (tau + dt);
+    float filtered = alpha * raw + (1.0f - alpha) * state->prev_x;
+    
+    state->prev_raw = raw;
+    state->prev_x = filtered;
+    state->prev_dx = dx;
+    return filtered;
+}
+#endif
+
 void Task_Send(void *argument) {
 	MX_USB_DEVICE_Init();
 	Calibration();
@@ -815,6 +849,21 @@ void Task_Send(void *argument) {
 	float buff_x[window] = {};
 	float buff_y[window] = {};
 
+#if defined(HEURISTIC_ONE_EURO)
+	// filters
+	one_euro_t oe_x = {0};
+    one_euro_t oe_y = {0};
+
+	BSP_ACCELERO_AccGetXYZ(pDataXYZ);
+    float init_x = (pDataXYZ[0] + cal_data.offset[0]) * cal_data.gain[0];
+    float init_y = (pDataXYZ[1] + cal_data.offset[1]) * cal_data.gain[1];
+
+	oe_x.prev_x = oe_x.prev_raw = init_y;
+    oe_y.prev_x = oe_y.prev_raw = -init_x;
+    bx = init_y; 
+    by = -init_x;
+#endif
+
 	for (;;) {
 		// calculate current time interval
 		uint32_t deadline = osKernelGetTickCount() + osKernelGetTickFreq() / freq;
@@ -828,16 +877,24 @@ void Task_Send(void *argument) {
 			data[i] += cal_data.offset[i];
 			data[i] *= cal_data.gain[i];
 		}
+#if defined(HEURISTIC)
 		ax = data[1], ay = -data[0];
-		pre_ax = buff_x[ptr_x], pre_ay = buff_y[ptr_y];
-		buff_x[ptr_x++] = ax, buff_y[ptr_y++] = ay;
-		ptr_x = (ptr_x == window) ? 0 : ptr_x;
-		ptr_y = (ptr_y == window) ? 0 : ptr_y;
+#elif defined(HEURISTIC_ONE_EURO)
+		float ax = one_euro_update(&oe_x, data[1], dt);
+        float ay = one_euro_update(&oe_y, -data[0], dt);
+#endif
+		
+		buff_x[ptr_x] = ax, buff_y[ptr_y] = ay;
+		ptr_x = (ptr_x + 1) % window;
+		ptr_y = (ptr_y + 1) % window;
 
-		sum_x += ax - pre_ax;
-		sum_x2 += ax * ax - pre_ax * pre_ax;
-		sum_y += ay - pre_ay;
-		sum_y2 += ay * ay - pre_ay * pre_ay;
+		sum_x = 0, sum_y = 0, sum_x2 = 0, sum_y2 = 0;
+        for(int i = 0; i < window; ++i) {
+			sum_x += buff_x[i];
+			sum_y += buff_y[i];
+			sum_x2 += buff_x[i] * buff_x[i];
+			sum_y2 += buff_y[i] * buff_y[i];
+		}
 
 		ex = sum_x / window;
 		ex2 = sum_x2 / window;
@@ -850,15 +907,17 @@ void Task_Send(void *argument) {
 		abs_ey = ey >= 0.0 ? ey : -ey;
 
 		++count;
+		if(count < window) {
+			osDelayUntil(deadline);
+			continue;
+		}
 
 		// x
-		if (count >= window) {
-			if (var_x < threshold && abs_ex < threshold2)
-				cx += 1;
-			else
-				cx = 0;
-		} else
+		// if (var_x < threshold && abs_ex < threshold2)
+		if (var_x < threshold)
 			cx += 1;
+		else
+			cx = 0;
 		if (cx >= frames) {
 			vx = prev_vx = 0.0;
 			bx = (1 - alpha) * bx + alpha * ax;
@@ -869,13 +928,11 @@ void Task_Send(void *argument) {
 		}
 
 		// y
-		if (count >= window) {
-			if (var_y < threshold && abs_ey < threshold2)
-				cy += 1;
-			else
-				cy = 0;
-		} else
+		// if (var_y < threshold && abs_ey < threshold2)
+		if (var_y < threshold)
 			cy += 1;
+		else
+			cy = 0;
 		if (cy >= frames) {
 			vy = prev_vy = 0.0;
 			by = (1 - alpha) * by + alpha * ay;
@@ -885,9 +942,24 @@ void Task_Send(void *argument) {
 			prev_vy = vy;
 		}
 
+	
+#if defined(HEURISTIC)	
 		// calculate theoritical velocity
-		target_x = (vx * scale) + res_x;
-		target_y = (vy * scale) + res_y;
+        float target_x = vx * scale + res_x;
+        float target_y = vy * scale + res_y;
+#elif defined(HEURISTIC_ONE_EURO)
+		// friction
+		if (cx < frames) vx *= FRICTION;
+        if (cy < frames) vy *= FRICTION;
+
+		// fitt's law
+		float speed = sqrtf(vx*vx + vy*vy);
+		float current_scale = SCALE_BASE + (speed * SCALE_ACCEL);
+        
+		// calculate theoritical velocity
+        float target_x = vx * current_scale + res_x;
+        float target_y = vy * current_scale + res_y;
+#endif
 
 		// casting (float -> int)
 		tmp_x = (int) target_x;
