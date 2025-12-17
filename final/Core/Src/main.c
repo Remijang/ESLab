@@ -117,6 +117,7 @@ float vx = 0.0, vy = 0.0;
 float prev_vx = 0.0, prev_vy = 0.0;
 float px = 0.0, py = 0.0;
 float bx = 0.0, by = 0.0;
+float prev_vx = 0.0, prev_vy = 0.0;
 int ptr_x = 0, ptr_y = 0;
 int cx = 0, cy = 0;
 int count = 0;
@@ -161,9 +162,9 @@ typedef struct {
 		#define SCALE_ACCEL 2.0f
 
 typedef struct {
-    float x;
-    float P;
-    float K;
+	float x;
+	float P;
+	float K;
 } kalman_t;
 	#endif
 
@@ -843,21 +844,21 @@ float one_euro_update(one_euro_t *state, float raw, float dt) {
 
 	#if defined(HEURISTIC_KALMAN)
 float kalman_update(kalman_t *k, float measurement) {
-    float x_pred = k->x;
-    float P_pred = k->P + KF_Q;
+	float x_pred = k->x;
+	float P_pred = k->P + KF_Q;
 
-    float innovation = measurement - x_pred;
-    
-    float dynamic_R = KF_R_BASE;
-    if (fabsf(innovation) > 0.5f) {
-        dynamic_R = KF_R_BASE / 10.0f;
-    }
+	float innovation = measurement - x_pred;
 
-    k->K = P_pred / (P_pred + dynamic_R);
-    k->x = x_pred + k->K * innovation;
-    k->P = (1.0f - k->K) * P_pred;
+	float dynamic_R = KF_R_BASE;
+	if (fabsf(innovation) > 0.5f) {
+		dynamic_R = KF_R_BASE / 10.0f;
+	}
 
-    return k->x;
+	k->K = P_pred / (P_pred + dynamic_R);
+	k->x = x_pred + k->K * innovation;
+	k->P = (1.0f - k->K) * P_pred;
+
+	return k->x;
 }
 	#endif
 
@@ -895,38 +896,38 @@ void Task_Send(void *argument) {
 	float init_x = (pDataXYZ[0] + cal_data.offset[0]) * cal_data.gain[0];
 	float init_y = (pDataXYZ[1] + cal_data.offset[1]) * cal_data.gain[1];
 
-	#if defined(remijang)
+		#if defined(remijang)
 	oe_x.prev_x = oe_x.prev_raw = init_y;
-	oe_y.prev_x = oe_y.prev_raw = -init_x;
+	oe_y.prev_x = oe_y.prev_raw = init_x;
 	bx = init_y;
 	by = -init_x;
-	#else
+		#else
 	oe_x.prev_x = oe_x.prev_raw = init_y;
 	oe_y.prev_x = oe_y.prev_raw = init_x;
 	bx = init_y;
 	by = init_x;
-	#endif
+		#endif
 
 	#elif defined(HEURISTIC_KALMAN)
 	// filters
 	kalman_t kf_x = {0, 1.0f, 0};
-    kalman_t kf_y = {0, 1.0f, 0};
+	kalman_t kf_y = {0, 1.0f, 0};
 
-    BSP_ACCELERO_AccGetXYZ(pDataXYZ);
-    float init_x = (pDataXYZ[0] + cal_data.offset[0]) * cal_data.gain[0];
-    float init_y = (pDataXYZ[1] + cal_data.offset[1]) * cal_data.gain[1];
+	BSP_ACCELERO_AccGetXYZ(pDataXYZ);
+	float init_x = (pDataXYZ[0] + cal_data.offset[0]) * cal_data.gain[0];
+	float init_y = (pDataXYZ[1] + cal_data.offset[1]) * cal_data.gain[1];
 
-	#if defined(remijang)
-    kf_x.x = init_y; 
-    kf_y.x = -init_x;
-    bx = init_y;
-    by = -init_x;
-	#else
-    kf_x.x = init_y; 
-    kf_y.x = init_x;
-    bx = init_y;
-    by = init_x;
-	#endif
+		#if defined(remijang)
+	kf_x.x = init_y;
+	kf_y.x = -init_x;
+	bx = init_y;
+	by = -init_x;
+		#else
+	kf_x.x = init_y;
+	kf_y.x = init_x;
+	bx = init_y;
+	by = init_x;
+		#endif
 	#endif
 
 	for (;;) {
@@ -943,25 +944,25 @@ void Task_Send(void *argument) {
 			data[i] *= cal_data.gain[i];
 		}
 	#if defined(remijang)
-	#if defined(HEURISTIC)
+		#if defined(HEURISTIC)
 		ax = data[1], ay = data[0];
-	#elif defined(HEURISTIC_ONE_EURO)
+		#elif defined(HEURISTIC_ONE_EURO)
 		float ax = one_euro_update(&oe_x, data[1], dt);
 		float ay = one_euro_update(&oe_y, -data[0], dt);
-	#elif defined(HEURISTIC_KALMAN)
+		#elif defined(HEURISTIC_KALMAN)
 		float ax = kalman_update(&kf_x, data[1]);
-        float ay = kalman_update(&kf_y, -data[0]);
-	#endif
+		float ay = kalman_update(&kf_y, -data[0]);
+		#endif
 	#else
-	#if defined(HEURISTIC)
+		#if defined(HEURISTIC)
 		ax = data[1], ay = data[0];
-	#elif defined(HEURISTIC_ONE_EURO)
+		#elif defined(HEURISTIC_ONE_EURO)
 		float ax = one_euro_update(&oe_x, data[1], dt);
 		float ay = one_euro_update(&oe_y, data[0], dt);
-	#elif defined(HEURISTIC_KALMAN)
+		#elif defined(HEURISTIC_KALMAN)
 		float ax = kalman_update(&kf_x, raw_y);
-        float ay = kalman_update(&kf_y, raw_x);
-	#endif
+		float ay = kalman_update(&kf_y, raw_x);
+		#endif
 	#endif
 
 		buff_x[ptr_x] = ax, buff_y[ptr_y] = ay;
@@ -1101,7 +1102,7 @@ void Task_Send_RNN(void *argument) {
 
 	int t = 0;
 	float output[2] = {0.0};
-	float scale = 32;
+	float scale = 25;
 	float buf_dx = 0, buf_dy = 0;
 	for (;;) {
 		// calculate current time interval
@@ -1174,13 +1175,13 @@ void Task_Send_RNN(void *argument) {
 			report.dy = 0;
 		}
 
-		// printf("%d, %d\n", report.dx, report.dy);
+		printf("%d, %d\n", report.dx, report.dy);
 		uint32_t end = osKernelGetTickCount();
-		// printf("time: %d ms\n", (end - start) * 1000 / osKernelGetTickFreq());
+		printf("time: %d ms\n", (end - start) * 1000 / osKernelGetTickFreq());
 		USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
 		osStatus_t ret = osDelayUntil(deadline);
 		if (ret != osOK) {
-			// printf("Deadline missed\n");
+			printf("Deadline missed\n");
 		}
 	}
 }

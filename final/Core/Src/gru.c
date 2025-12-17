@@ -2422,29 +2422,13 @@ void gru_dsp(
 			printf("Arm math failed %d\n", ret);
 		}
 		for (int i = 0; i < 2 * HIDDEN_SIZE; i++) {
-			if (isnan(buffer_in[i] + buffer_hidden[i])) {
-				printf("nan before sigmoid\n");
-				break;
-			}
 			buffer[i] = sigmoid_stable(buffer_in[i] + buffer_hidden[i]);
-			if (isnan(buffer[i])) {
-				printf("nan after sigmoid\n");
-				break;
-			}
 		}
 		arm_mult_f32(r, buffer_hidden + 2 * HIDDEN_SIZE, r, HIDDEN_SIZE);
 		arm_add_f32(r, buffer_in + 2 * HIDDEN_SIZE, r, HIDDEN_SIZE);
 
 		for (int i = 0; i < HIDDEN_SIZE; i++) {
-			if (isnan(r[i])) {
-				printf("nan before tanh\n");
-				break;
-			}
 			n[i] = fast_tanh(r[i]);
-			if (isnan(n[i])) {
-				printf("nan after tanh\n");
-				break;
-			}
 		}
 		for (int i = 0; i < HIDDEN_SIZE; i++) {
 			hidden_next[l][i] = (1 - z[i]) * n[i] + z[i] * hidden[l][i];

@@ -38,25 +38,25 @@ class RNNDataset:
             L = len(data)
             augmented_data.append(data)
             augmented_label.append(label)
-            for i in range(1, 24):
+            for i in range(1, 8):
                 new_data = data.clone()
                 new_label = label.clone()
                 for j in range(L):
                     x = new_data[j][0] - bias_x
                     y = new_data[j][1] - bias_y
                     new_data[j][0] = (
-                        math.cos(math.pi / 12 * i) * x - math.sin(math.pi / 12 * i) * y
+                        math.cos(math.pi / 4 * i) * x - math.sin(math.pi / 4 * i) * y
                     ) + bias_x
                     new_data[j][1] = (
-                        math.sin(math.pi / 12 * i) * x + math.cos(math.pi / 12 * i) * y
+                        math.sin(math.pi / 4 * i) * x + math.cos(math.pi / 4 * i) * y
                     ) + bias_y
                 new_label[0] = (
-                    math.cos(math.pi / 12 * i) * label[0]
-                    - math.sin(math.pi / 12 * i) * label[1]
+                    math.cos(math.pi / 4 * i) * label[0]
+                    - math.sin(math.pi / 4 * i) * label[1]
                 )
                 new_label[1] = (
-                    math.sin(math.pi / 12 * i) * label[0]
-                    + math.cos(math.pi / 12 * i) * label[1]
+                    math.sin(math.pi / 4 * i) * label[0]
+                    + math.cos(math.pi / 4 * i) * label[1]
                 )
                 augmented_data.append(new_data)
                 augmented_label.append(new_label)
