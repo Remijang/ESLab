@@ -11,3 +11,4 @@ lab2/**/.git*/
 **/STM32CubeL4/
 **/rnn_params.pth
 **/save*
+**/trace.txt

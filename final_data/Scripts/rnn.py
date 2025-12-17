@@ -3,6 +3,7 @@ import random
 import torch
 from torch import nn
 from tqdm.auto import tqdm
+import math
 
 A = 1.0011583795355363
 B = 0.995068796668601
@@ -14,11 +15,6 @@ G = 1003.5581817562975
 
 DATA_FILE = "Datas/data.txt"
 LABEL_FILE = "Datas/label.txt"
-DATA_AUG_FILE = "Datas/data_reflection.txt"
-LABEL_AUG_FILE = "Datas/label_reflection.txt"
-REG_DATA_FILE = "Datas/reg_data.txt"
-REG_LABEL_FILE = "Datas/reg_label.txt"
-MASK_FILE = "Datas/mask.txt"
 
 MEAN = torch.tensor([0.0, 0.0])
 STD = torch.tensor([2.5, 2.5])
@@ -27,28 +23,49 @@ DEVICE = "cuda"
 
 
 class RNNDataset:
-    def __init__(self, use_reflection=False):
-        self.data = self._load_file(DATA_FILE, maskfile=MASK_FILE)
-        if use_reflection:
-            self.data = self._load_file(DATA_AUG_FILE)
-        self.label = self._load_label(LABEL_FILE, maskfile=MASK_FILE)
-        if use_reflection:
-            self.label = self._load_label(LABEL_AUG_FILE)
-        self.reg_data = self._load_file(REG_DATA_FILE)
-        self.reg_label = self._load_reglabel(REG_LABEL_FILE)
+    def __init__(self, augmentation=False):
+        self.data = self._load_file(DATA_FILE)
+        self.label = self._load_label(LABEL_FILE)
+        if augmentation:
+            self.data, self.label = self._augment(self.data, self.label)
 
-    def _load_file(self, filename, maskfile=""):
+    def _augment(self, datas, labels):
+        augmented_data = []
+        augmented_label = []
+        for data, label in zip(datas, labels):
+            bias_x = sum([data[i][0] for i in range(10)]) / 10
+            bias_y = sum([data[i][1] for i in range(10)]) / 10
+            L = len(data)
+            augmented_data.append(data)
+            augmented_label.append(label)
+            for i in range(1, 24):
+                new_data = data.clone()
+                new_label = label.clone()
+                for j in range(L):
+                    x = new_data[j][0] - bias_x
+                    y = new_data[j][1] - bias_y
+                    new_data[j][0] = (
+                        math.cos(math.pi / 12 * i) * x - math.sin(math.pi / 12 * i) * y
+                    ) + bias_x
+                    new_data[j][1] = (
+                        math.sin(math.pi / 12 * i) * x + math.cos(math.pi / 12 * i) * y
+                    ) + bias_y
+                new_label[0] = (
+                    math.cos(math.pi / 12 * i) * label[0]
+                    - math.sin(math.pi / 12 * i) * label[1]
+                )
+                new_label[1] = (
+                    math.sin(math.pi / 12 * i) * label[0]
+                    + math.cos(math.pi / 12 * i) * label[1]
+                )
+                augmented_data.append(new_data)
+                augmented_label.append(new_label)
+        return augmented_data, augmented_label
+
+    def _load_file(self, filename):
         result = []
         augmented_result = []
         count = -1
-        masked = []
-        if maskfile != "":
-            with open(maskfile, "r") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    masked.append(int(line))
 
         with open(filename, "r") as f:
             for line in f:
@@ -69,54 +86,12 @@ class RNNDataset:
                 nums = torch.tensor(nums).unsqueeze(dim=0)
                 result[count].append(nums)
         for i in range(count + 1):
-            if i in masked:
-                continue
             result[i] = torch.cat(result[i])
-            for _ in range(AUGMENTED_RATIO - 1):
-                tmp = result[i].clone()
-                for k in range(len(result[i])):
-                    if random.random() < 0.1:
-                        tmp[k] += torch.normal(MEAN, STD)
-                augmented_result.append(tmp.to(DEVICE))
             augmented_result.append(result[i].to(DEVICE))
         return augmented_result
 
-    def _load_reglabel(self, filename):
+    def _load_label(self, filename):
         result = []
-        augmented_result = []
-        count = -1
-
-        with open(filename, "r") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-
-                if line.startswith("data"):
-                    result.append([])
-                    count += 1
-                    continue
-
-                nums = list(map(float, line.replace(" ", "").split(",")))
-                nums = torch.tensor(nums).unsqueeze(dim=0)
-                result[count].append(nums)
-        for i in range(count + 1):
-            result[i] = torch.cat(result[i])
-            for _ in range(AUGMENTED_RATIO):
-                augmented_result.append(result[i].clone().to(DEVICE))
-        return augmented_result
-
-    def _load_label(self, filename, maskfile=""):
-        result = []
-        augmented_result = []
-        masked = []
-        if maskfile != "":
-            with open(maskfile, "r") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    masked.append(int(line))
         with open(filename, "r") as f:
             for line in f:
                 line = line.strip()
@@ -124,14 +99,8 @@ class RNNDataset:
                     continue
 
                 nums = torch.tensor(list(map(float, line.replace(" ", "").split(","))))
-                result.append(nums)
-        for i in range(len(result)):
-            if i in masked:
-                continue
-            for _ in range(AUGMENTED_RATIO):
-                augmented_result.append(result[i].clone().to(DEVICE))
-
-        return augmented_result
+                result.append(nums.to(DEVICE))
+        return result
 
     def __getitem__(self, key):
         return self.data[key], self.label[key]
@@ -171,11 +140,11 @@ class SimpleRNN(nn.Module):
 
 
 INTERVAL = 0.01
-BATCH_SIZE = 16
+BATCH_SIZE = 64
 
 
 def main(args):
-    dataset = RNNDataset(use_reflection=args.use_reflection)
+    dataset = RNNDataset(augmentation=args.augmentation)
     model = SimpleRNN(
         input_size=2, hidden_size=args.hidden_size, output_size=2, num_layers=args.layer
     ).to(DEVICE)
@@ -185,19 +154,16 @@ def main(args):
     gelu = nn.GELU()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=0.01)
     N = len(dataset)
-    M = len(dataset.reg_data)
     shuffle = [i for i in range(N)]
     pbar = tqdm(range(args.epochs))
-    print(N, M)
     loss_history = []
     for _ in pbar:
         model.train()
         random.shuffle(shuffle)
-        epoch_train_loss, epoch_reg_loss, epoch_drift_loss = 0.0, 0.0, 0.0
+        epoch_train_loss, epoch_drift_loss = 0.0, 0.0
         for b in range(0, N, BATCH_SIZE):
             optimizer.zero_grad()
             train_loss = torch.zeros((1,), device=DEVICE)
-            reg_loss = torch.zeros((1,), device=DEVICE)
             drift_loss = torch.zeros((1,), device=DEVICE)
             for n in range(b, min(N, b + BATCH_SIZE)):
                 x, y = dataset[shuffle[n]]
@@ -214,46 +180,32 @@ def main(args):
                             acc_drift[0] ** 2 + acc_drift[1] ** 2 - args.thresh
                         )
                 train_loss += criterion(p * model.alpha, y)
+
             train_loss /= min(N, b + BATCH_SIZE) - b
             drift_loss /= min(N, b + BATCH_SIZE) - b
 
-            for n in range(M):
-                x, y = dataset.reg_data[n], dataset.reg_label[n]
-                p = torch.tensor([0.0, 0.0], device=DEVICE)
-                L = len(x)
-                y_pred, _ = model(x)
-                y_pred *= model.alpha
-                reg_loss += criterion(y_pred, y) * INTERVAL
-            reg_loss /= M
-            total_loss = (
-                args.p_weight * train_loss
-                + args.v_weight * reg_loss
-                + args.a_weight * drift_loss
-            )
+            total_loss = args.p_weight * train_loss + args.a_weight * drift_loss
+            total_loss.backward()
+            # torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            optimizer.step()
             epoch_train_loss += (train_loss.item()) * (min(N, b + BATCH_SIZE) - b)
-            epoch_reg_loss += reg_loss.item()
             epoch_drift_loss += (drift_loss.item()) * (min(N, b + BATCH_SIZE) - b)
         epoch_train_loss /= N
         epoch_drift_loss /= N
-        epoch_reg_loss /= (N + BATCH_SIZE - 1) // BATCH_SIZE
         epoch_total_loss = (
-            args.p_weight * epoch_train_loss
-            + args.v_weight * epoch_reg_loss
-            + args.a_weight * epoch_drift_loss
+            args.p_weight * epoch_train_loss + args.a_weight * epoch_drift_loss
         )
-        loss_history.append(total_loss.item())
-        if total_loss.item() == min(loss_history):
+        loss_history.append(epoch_total_loss)
+        if epoch_total_loss == min(loss_history):
             torch.save(model.state_dict(), args.save_path)
-        total_loss.backward()
-        optimizer.step()
         pbar.set_postfix(
             {
                 "train_loss": f"{epoch_train_loss:.2f}",
-                "reg_loss": f"{epoch_reg_loss:.2f}",
                 "drift_loss": f"{epoch_drift_loss:.2f}",
                 "total_loss": f"{epoch_total_loss:.2f}",
             }
         )
+
     print(f"Saved model params to {args.save_path}")
     print(f"minimum loss is {min(loss_history)}")
 
@@ -268,7 +220,7 @@ def parse():
     parser.add_argument("--p_weight", type=float, default=1)
     parser.add_argument("--v_weight", type=float, default=0.1)
     parser.add_argument("--a_weight", type=float, default=1)
-    parser.add_argument("--use_reflection", action="store_true", default=False)
+    parser.add_argument("--augmentation", action="store_true", default=False)
     parser.add_argument(
         "--save_path",
         type=str,

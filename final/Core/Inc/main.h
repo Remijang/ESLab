@@ -31,10 +31,10 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "stm32l475e_iot01_accelero.h"
-
-#include "rnn.h"
 #include "arm_math.h"
+#include "gru.h"
+#include "rnn.h"
+#include "stm32l475e_iot01_accelero.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -50,8 +50,10 @@ typedef struct {
 // #define RNN
 // #define RNN_DSP
 // #define RNN_DSP_Q15
+#define GRU_DSP
+// #define RNN_DSP_Q15
 // #define HEURISTIC
-#define HEURISTIC_ONE_EURO
+// #define HEURISTIC_ONE_EURO
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */

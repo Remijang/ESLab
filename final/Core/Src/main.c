@@ -64,7 +64,7 @@ const osThreadAttr_t TaskSend_attributes = {
 osThreadId_t tid_send_rnn;
 const osThreadAttr_t TaskSendRNN_attributes = {
 	.name = "TaskRNN",
-	.stack_size = 256 * 4,
+	.stack_size = 512 * 4,
 	.priority = (osPriority_t)osPriorityLow,
 };
 
@@ -134,22 +134,22 @@ char final_x, final_y;
 float res_x = 0.0, res_y = 0.0;
 float px2 = 0.0, py2 = 0.0;
 
-#if defined(HEURISTIC_ONE_EURO)
-// filter
-#define OE_MIN_CUTOFF 1.0f
-#define OE_BETA       0.08f
+	#if defined(HEURISTIC_ONE_EURO)
+		// filter
+		#define OE_MIN_CUTOFF 1.0f
+		#define OE_BETA 0.08f
 
-#define FRICTION      0.95f
-#define SCALE_BASE    4.0f
-#define SCALE_ACCEL   0.3f
+		#define FRICTION 0.95f
+		#define SCALE_BASE 4.0f
+		#define SCALE_ACCEL 0.3f
 
 typedef struct {
-    float prev_x;
-    float prev_dx;
-    float prev_raw;
+	float prev_x;
+	float prev_dx;
+	float prev_raw;
 } one_euro_t;
 
-#endif
+	#endif
 
 #endif
 
@@ -218,7 +218,7 @@ int main(void) {
 
 #ifdef HEURISTIC
 	tid_send = osThreadNew(Task_Send, NULL, &TaskSend_attributes);
-#elif defined(RNN) || defined(RNN_DSP) || defined(RNN_DSP_Q15)
+#else
 	tid_send_rnn = osThreadNew(Task_Send_RNN, NULL, &TaskSendRNN_attributes);
 #endif
 
@@ -806,23 +806,24 @@ void Calibration() {
 	}
 }
 
-#if defined(HEURISTIC_ONE_EURO)
+	#if defined(HEURISTIC_ONE_EURO)
 float one_euro_update(one_euro_t *state, float raw, float dt) {
-    float dx = (raw - state->prev_raw) / dt;
-    
-    float edx = fabsf(dx);
-    float cutoff = OE_MIN_CUTOFF + OE_BETA * edx;
-    
-    float tau = 1.0f / (2.0f * 3.14159f * cutoff); // time const = 1 / w = 1 / (2 pi freq)
-    float alpha = dt / (tau + dt);
-    float filtered = alpha * raw + (1.0f - alpha) * state->prev_x;
-    
-    state->prev_raw = raw;
-    state->prev_x = filtered;
-    state->prev_dx = dx;
-    return filtered;
+	float dx = (raw - state->prev_raw) / dt;
+
+	float edx = fabsf(dx);
+	float cutoff = OE_MIN_CUTOFF + OE_BETA * edx;
+
+	float tau =
+		1.0f / (2.0f * 3.14159f * cutoff);	// time const = 1 / w = 1 / (2 pi freq)
+	float alpha = dt / (tau + dt);
+	float filtered = alpha * raw + (1.0f - alpha) * state->prev_x;
+
+	state->prev_raw = raw;
+	state->prev_x = filtered;
+	state->prev_dx = dx;
+	return filtered;
 }
-#endif
+	#endif
 
 void Task_Send(void *argument) {
 	MX_USB_DEVICE_Init();
@@ -849,20 +850,20 @@ void Task_Send(void *argument) {
 	float buff_x[window] = {};
 	float buff_y[window] = {};
 
-#if defined(HEURISTIC_ONE_EURO)
+	#if defined(HEURISTIC_ONE_EURO)
 	// filters
 	one_euro_t oe_x = {0};
-    one_euro_t oe_y = {0};
+	one_euro_t oe_y = {0};
 
 	BSP_ACCELERO_AccGetXYZ(pDataXYZ);
-    float init_x = (pDataXYZ[0] + cal_data.offset[0]) * cal_data.gain[0];
-    float init_y = (pDataXYZ[1] + cal_data.offset[1]) * cal_data.gain[1];
+	float init_x = (pDataXYZ[0] + cal_data.offset[0]) * cal_data.gain[0];
+	float init_y = (pDataXYZ[1] + cal_data.offset[1]) * cal_data.gain[1];
 
 	oe_x.prev_x = oe_x.prev_raw = init_y;
-    oe_y.prev_x = oe_y.prev_raw = -init_x;
-    bx = init_y; 
-    by = -init_x;
-#endif
+	oe_y.prev_x = oe_y.prev_raw = -init_x;
+	bx = init_y;
+	by = -init_x;
+	#endif
 
 	for (;;) {
 		// calculate current time interval
@@ -877,19 +878,19 @@ void Task_Send(void *argument) {
 			data[i] += cal_data.offset[i];
 			data[i] *= cal_data.gain[i];
 		}
-#if defined(HEURISTIC)
+	#if defined(HEURISTIC)
 		ax = data[1], ay = -data[0];
-#elif defined(HEURISTIC_ONE_EURO)
+	#elif defined(HEURISTIC_ONE_EURO)
 		float ax = one_euro_update(&oe_x, data[1], dt);
-        float ay = one_euro_update(&oe_y, -data[0], dt);
-#endif
-		
+		float ay = one_euro_update(&oe_y, -data[0], dt);
+	#endif
+
 		buff_x[ptr_x] = ax, buff_y[ptr_y] = ay;
 		ptr_x = (ptr_x + 1) % window;
 		ptr_y = (ptr_y + 1) % window;
 
 		sum_x = 0, sum_y = 0, sum_x2 = 0, sum_y2 = 0;
-        for(int i = 0; i < window; ++i) {
+		for (int i = 0; i < window; ++i) {
 			sum_x += buff_x[i];
 			sum_y += buff_y[i];
 			sum_x2 += buff_x[i] * buff_x[i];
@@ -907,7 +908,7 @@ void Task_Send(void *argument) {
 		abs_ey = ey >= 0.0 ? ey : -ey;
 
 		++count;
-		if(count < window) {
+		if (count < window) {
 			osDelayUntil(deadline);
 			continue;
 		}
@@ -942,45 +943,49 @@ void Task_Send(void *argument) {
 			prev_vy = vy;
 		}
 
-	
-#if defined(HEURISTIC)	
+	#if defined(HEURISTIC)
 		// calculate theoritical velocity
-        float target_x = vx * scale + res_x;
-        float target_y = vy * scale + res_y;
-#elif defined(HEURISTIC_ONE_EURO)
+		float target_x = vx * scale + res_x;
+		float target_y = vy * scale + res_y;
+	#elif defined(HEURISTIC_ONE_EURO)
 		// friction
-		if (cx < frames) vx *= FRICTION;
-        if (cy < frames) vy *= FRICTION;
+		if (cx < frames)
+			vx *= FRICTION;
+		if (cy < frames)
+			vy *= FRICTION;
 
 		// fitt's law
-		float speed = sqrtf(vx*vx + vy*vy);
+		float speed = sqrtf(vx * vx + vy * vy);
 		float current_scale = SCALE_BASE + (speed * SCALE_ACCEL);
-        
+
 		// calculate theoritical velocity
-        float target_x = vx * current_scale + res_x;
-        float target_y = vy * current_scale + res_y;
-#endif
+		float target_x = vx * current_scale + res_x;
+		float target_y = vy * current_scale + res_y;
+	#endif
 
 		// casting (float -> int)
-		tmp_x = (int) target_x;
-		tmp_y = (int) target_y;
+		tmp_x = (int)target_x;
+		tmp_y = (int)target_y;
 
 		// clamp
 		clamp_x = (tmp_x >= 127) ? 127 : (tmp_x <= -128) ? -128 : tmp_x;
 		clamp_y = (tmp_y >= 127) ? 127 : (tmp_y <= -128) ? -128 : tmp_y;
 
 		// casting (int -> char)
-		final_x = (char) clamp_x;
-		final_y = (char) clamp_y;
+		final_x = (char)clamp_x;
+		final_y = (char)clamp_y;
 
 		// update residue
-		res_x = target_x - (float) clamp_x;
-		res_y = target_y - (float) clamp_y;
+		res_x = target_x - (float)clamp_x;
+		res_y = target_y - (float)clamp_y;
 
-		px2 += (float) clamp_x * dt / scale;
-		py2 += (float) clamp_y * dt / scale;
+		px2 += (float)clamp_x * dt / scale;
+		py2 += (float)clamp_y * dt / scale;
 
-		printf("%d\t%d\t%.2f\t%.2f\t   %.2f\t%.2f\t%.2f\t%.2f\t\n", tmp_x, tmp_y, res_x, res_y, px, py, px2, py2);
+		printf(
+			"%d\t%d\t%.2f\t%.2f\t   %.2f\t%.2f\t%.2f\t%.2f\t\n", tmp_x, tmp_y, res_x,
+			res_y, px, py, px2, py2
+		);
 
 		report.dx = final_x;
 		report.dy = final_y;
@@ -991,11 +996,11 @@ void Task_Send(void *argument) {
 
 #endif
 
-#if defined(RNN) || defined(RNN_DSP) || defined(RNN_DSP_Q15)
+#if defined(RNN) || defined(RNN_DSP) || defined(RNN_DSP_Q15) || defined(GRU) || \
+	defined(GRU_DSP)
 
 void Task_Send_RNN(void *argument) {
 	MX_USB_DEVICE_Init();
-	// Calibration();
 
 	const float A = 1.0011583795355363, B = 0.995068796668601, C = 1.0;
 	const float D = -1.6759465583366173, E = -1.537611331891522, F = 8.423808603551663;
@@ -1009,18 +1014,19 @@ void Task_Send_RNN(void *argument) {
 
 	const float interval = 0.01;
 
-#if defined(RNN) || defined(RNN_DSP)
+	#if defined(RNN) || defined(RNN_DSP) || defined(GRU) || defined(GRU_DSP)
 	float hidden[2][LAYER_NUM][HIDDEN_SIZE] = {{{0.0}}};
-#elif defined(RNN_DSP_Q15)
+	#elif defined(RNN_DSP_Q15)
 	q15_t hidden[2][LAYER_NUM][HIDDEN_SIZE] = {{{0.0}}};
-#endif
+	#endif
 
 	int t = 0;
 	float output[2] = {0.0};
-	float scale = 16;
+	float scale = 32;
 	float buf_dx = 0, buf_dy = 0;
 	for (;;) {
 		// calculate current time interval
+		uint32_t start = osKernelGetTickCount();
 		uint32_t deadline = osKernelGetTickCount() + osKernelGetTickFreq() / freq;
 
 		// sample accelerometer data
@@ -1028,22 +1034,38 @@ void Task_Send_RNN(void *argument) {
 		// printf("%d, %d\n", pDataXYZ[0], pDataXYZ[1]);
 		// calibration
 		float data[2] = {pDataXYZ[0], pDataXYZ[1]};
-
 		float ax = (data[1] - E) / B;
 		float ay = -(data[0] - D) / A;
+	#if defined(GRU_DSP)
+		gru_dsp_init();
+	#endif
 
-#if defined(RNN)
+	#if defined(RNN)
 		rnn(ax, ay, hidden[t], output, hidden[t ^ 1]);
-#elif defined(RNN_DSP)
+	#elif defined(RNN_DSP)
 		rnn_dsp(ax, ay, hidden[t], output, hidden[t ^ 1]);
-#elif defined(RNN_DSP_Q15)
+	#elif defined(RNN_DSP_Q15)
 		rnn_dsp_q15(ax, ay, hidden[t], output, hidden[t ^ 1]);
-#endif
+	#elif defined(GRU)
+		gru(ax, ay, hidden[t], output, hidden[t ^ 1]);
+	#elif defined(GRU_DSP)
+		gru_dsp(ax, ay, hidden[t], output, hidden[t ^ 1]);
+	#endif
 		t ^= 1;
 
 		float vx = output[0];
 		float vy = output[1];
+		if (isnan(vx) || isnan(vy)) {
+			// printf("overflow, resetting\n");
+			vx = 0, vy = 0;
+			for (int j = 0; j < LAYER_NUM; j++) {
+				for (int i = 0; i < HIDDEN_SIZE; i++) {
+					hidden[t][j][i] = 0.0;
+				}
+			}
+		}
 
+		// printf("%f, %f\n", vx, vy);
 		buf_dx += vx * interval * rnn_alpha * scale;
 		buf_dy -= vy * interval * rnn_alpha * scale;
 
@@ -1071,10 +1093,14 @@ void Task_Send_RNN(void *argument) {
 			report.dy = 0;
 		}
 
-		printf("%d, %d\n", report.dx, report.dy);
-
+		// printf("%d, %d\n", report.dx, report.dy);
+		uint32_t end = osKernelGetTickCount();
+		// printf("time: %d ms\n", (end - start) * 1000 / osKernelGetTickFreq());
 		USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
-		osDelayUntil(deadline);
+		osStatus_t ret = osDelayUntil(deadline);
+		if (ret != osOK) {
+			// printf("Deadline missed\n");
+		}
 	}
 }
 
