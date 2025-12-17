@@ -137,12 +137,12 @@ float px2 = 0.0, py2 = 0.0;
 
 	#if defined(HEURISTIC_ONE_EURO)
 		// filter
-		#define OE_MIN_CUTOFF 1.0f
-		#define OE_BETA 0.08f
+		#define OE_MIN_CUTOFF 1.2f
+		#define OE_BETA 0.06f
 
-		#define FRICTION 0.99f
-		#define SCALE_BASE 40.0f
-		#define SCALE_ACCEL 3.0f
+		#define FRICTION 0.998f
+		#define SCALE_BASE 60.0f
+		#define SCALE_ACCEL 2.0f
 
 typedef struct {
 	float prev_x;
@@ -153,12 +153,12 @@ typedef struct {
 	#endif
 
 	#if defined(HEURISTIC_KALMAN)
-		#define KF_R_BASE 0.05f
-		#define KF_Q 0.001f 
+		#define KF_R_BASE 0.06f
+		#define KF_Q 0.002f
 
-		#define FRICTION 0.99f
-		#define SCALE_BASE 40.0f
-		#define SCALE_ACCEL 3.0f
+		#define FRICTION 0.998f
+		#define SCALE_BASE 60.0f
+		#define SCALE_ACCEL 2.0f
 
 typedef struct {
     float x;
@@ -880,7 +880,7 @@ void Task_Send(void *argument) {
 
 	// hyperparameters
 	float dt = 1.0 / freq;
-	float scale = 10.0;
+	float scale = 30.0;
 
 	// variables
 	float buff_x[window] = {};
