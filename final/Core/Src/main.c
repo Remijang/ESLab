@@ -744,7 +744,7 @@ void ACC_InitGPIO(void) {
 	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
-#ifdef defined(HEURISTIC) || defined(HEURISTIC_ONE_EURO) || defined(HEURISTIC_KALMAN)
+#if defined(HEURISTIC) || defined(HEURISTIC_ONE_EURO) || defined(HEURISTIC_KALMAN)
 
 void Calibration_Init() {
 	arm_mat_init_f32(&DtD, 6, 6, DtD_data);
@@ -880,7 +880,7 @@ void Task_Send(void *argument) {
 
 	// hyperparameters
 	float dt = 1.0 / freq;
-	float scale = 30.0;
+	float scale = 10.0;
 
 	// variables
 	float buff_x[window] = {};
@@ -944,13 +944,13 @@ void Task_Send(void *argument) {
 		}
 	#if defined(remijang)
 	#if defined(HEURISTIC)
-		ax = data[1], ay = -data[0];
+		ax = data[1], ay = data[0];
 	#elif defined(HEURISTIC_ONE_EURO)
 		float ax = one_euro_update(&oe_x, data[1], dt);
 		float ay = one_euro_update(&oe_y, -data[0], dt);
 	#elif defined(HEURISTIC_KALMAN)
-		float ax = kalman_update(&kf_x, raw_y);
-        float ay = kalman_update(&kf_y, -raw_x);
+		float ax = kalman_update(&kf_x, data[1]);
+        float ay = kalman_update(&kf_y, -data[0]);
 	#endif
 	#else
 	#if defined(HEURISTIC)
@@ -1076,7 +1076,7 @@ void Task_Send(void *argument) {
 #endif
 
 #if defined(RNN) || defined(RNN_DSP) || defined(RNN_DSP_Q15) || defined(GRU) || \
-	defined(GRU_DSP)
+	defined(GRU_DSP) || defined(GRU_DSP_Q15)
 
 void Task_Send_RNN(void *argument) {
 	MX_USB_DEVICE_Init();
@@ -1095,7 +1095,7 @@ void Task_Send_RNN(void *argument) {
 
 	#if defined(RNN) || defined(RNN_DSP) || defined(GRU) || defined(GRU_DSP)
 	float hidden[2][LAYER_NUM][HIDDEN_SIZE] = {{{0.0}}};
-	#elif defined(RNN_DSP_Q15)
+	#elif defined(RNN_DSP_Q15) || defined(GRU_DSP_Q15)
 	q15_t hidden[2][LAYER_NUM][HIDDEN_SIZE] = {{{0.0}}};
 	#endif
 
@@ -1129,6 +1129,8 @@ void Task_Send_RNN(void *argument) {
 		gru(ax, ay, hidden[t], output, hidden[t ^ 1]);
 	#elif defined(GRU_DSP)
 		gru_dsp(ax, ay, hidden[t], output, hidden[t ^ 1]);
+	#elif defined(GRU_DSP_Q15)
+		gru_dsp_q15(ax, ay, hidden[t], output, hidden[t ^ 1]);
 	#endif
 		t ^= 1;
 

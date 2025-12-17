@@ -1,12 +1,21 @@
 #include "main.h"
 
-#if defined(GRU) || defined(GRU_DSP)
+#ifdef GRU_DSP_Q15
 
 #include "math.h"
 
-const float rnn_alpha = 1.3222;	 // alpha is used to make rnn able to convert the unit
-								 // between cm and z-axis unit
-const float weight_ih[3 * HIDDEN_SIZE][2] = {
+/*  the following variables should not be able to access beyond this scope */
+const int16_t rnn_alpha = 3.2824;	 // alpha is used to make rnn able to convert the unit between cm and z-axis unit
+/* QUANTIZATION SCALES (Use these to dequantize): */
+float s_w_ih = 0.00001616;
+float s_w_ih_layers = 0.00002134;
+float s_b_ih = 0.00003072;
+float s_w_hh = 0.00004413;
+float s_b_hh = 0.00002765;
+float s_o_w = 0.00007316;
+float s_o_b = 0.00001944;
+
+const int16_t weight_ih[3 * HIDDEN_SIZE][2] = {
 	{0.43726813793182373, -0.19720715284347534},
 	{-0.09595919400453568, -0.013701125048100948},
 	{-0.18492227792739868, 0.10287994891405106},
@@ -69,7 +78,7 @@ const float weight_ih[3 * HIDDEN_SIZE][2] = {
 	{0.2501024901866913, -0.040000662207603455}
 };
 
-const float weight_ih_layers[LAYER_NUM - 1][3 * HIDDEN_SIZE][HIDDEN_SIZE] = {
+const int16_t weight_ih_layers[LAYER_NUM - 1][3 * HIDDEN_SIZE][HIDDEN_SIZE] = {
 	{{-0.38773998618125916, 0.19312112033367157,   -0.04079673811793327,
 	  -0.1836117058992386,	0.04148923233151436,   0.31433969736099243,
 	  -0.05429306626319885, -0.13849513232707977,  -0.13656830787658691,
@@ -912,7 +921,7 @@ const float weight_ih_layers[LAYER_NUM - 1][3 * HIDDEN_SIZE][HIDDEN_SIZE] = {
 	  0.21232876181602478,	-0.30903464555740356}}
 };
 
-const float bias_ih[LAYER_NUM][3 * HIDDEN_SIZE] = {
+const int16_t bias_ih[LAYER_NUM][3 * HIDDEN_SIZE] = {
 	{0.10478097200393677,  0.03524425998330116,	  0.0509273037314415,
 	 -0.1920318901538849,  0.03722294047474861,	  0.14016802608966827,
 	 0.06605621427297592,  -0.2478705793619156,	  0.1695569008588791,
@@ -975,7 +984,7 @@ const float bias_ih[LAYER_NUM][3 * HIDDEN_SIZE] = {
 	 -0.1215716004371643,  0.15140260756015778,	 0.047491855919361115}
 };
 
-const float weight_hh[LAYER_NUM][3 * HIDDEN_SIZE][HIDDEN_SIZE] = {
+const int16_t weight_hh[LAYER_NUM][3 * HIDDEN_SIZE][HIDDEN_SIZE] = {
 	{{-0.0023978634271770716, 0.07026750594377518,	 -0.10610590130090714,
 	  -0.0849786177277565,	  -0.2025408297777176,	 0.0850415974855423,
 	  -0.10449476540088654,	  0.24356451630592346,	 0.07768477499485016,
@@ -2236,7 +2245,7 @@ const float weight_hh[LAYER_NUM][3 * HIDDEN_SIZE][HIDDEN_SIZE] = {
 	  -0.3424263894557953,	0.347062349319458}}
 };
 
-const float bias_hh[LAYER_NUM][3 * HIDDEN_SIZE] = {
+const int16_t bias_hh[LAYER_NUM][3 * HIDDEN_SIZE] = {
 	{0.1047808900475502,   0.03524425998330116,	  0.0509273037314415,
 	 -0.16820432245731354, 0.03722294047474861,	  0.14016802608966827,
 	 0.06592494994401932,  -0.24783343076705933,  0.17171990871429443,
@@ -2299,7 +2308,7 @@ const float bias_hh[LAYER_NUM][3 * HIDDEN_SIZE] = {
 	 0.1827680766582489,	0.36552903056144714,  0.2547867000102997}
 };
 
-const float weight_output[2][HIDDEN_SIZE] = {
+const int16_t weight_output[2][HIDDEN_SIZE] = {
 	{2.7766611576080322,  4.0517168045043945,  -4.468652725219727,	4.236557960510254,
 	 3.6280689239501953,  3.2262251377105713,  -5.051209449768066,	3.0297391414642334,
 	 -3.6248795986175537, 3.108802318572998,   -3.1769115924835205, 4.047637462615967,
@@ -2312,10 +2321,13 @@ const float weight_output[2][HIDDEN_SIZE] = {
 	 -2.5829150676727295, 4.536394119262695,	-4.888004302978516,	 4.143005847930908}
 };
 
-const float bias_output[2] = {0.43893811106681824, 0.06760842353105545};
+const int16_t bias_output[2] = {0.43893811106681824, 0.06760842353105545};
 
-arm_matrix_instance_f32 mat_weight_ih[LAYER_NUM], mat_weight_hh[LAYER_NUM],
-	mat_bias_ih[LAYER_NUM], mat_bias_hh[LAYER_NUM], mat_weight_out, mat_bias_out;
+static inline q15_t clip_q15(float x) {
+    if (x >= 1.0f) return 32767;
+    if (x <= -1.0f) return -32768;
+    return (q15_t)(x / 32768.0f);
+}
 
 // fast tanh
 static inline float fast_tanh(float x) {
@@ -2364,152 +2376,109 @@ static inline float sigmoid_stable(float x) {
 		return expx / (1 + expx);
 	}
 }
-void gru_dsp_init() {
-	arm_mat_init_f32(&mat_weight_ih[0], 3 * HIDDEN_SIZE, 2, (float *)weight_ih);
-	arm_mat_init_f32(&mat_weight_out, 2, HIDDEN_SIZE, (float *)weight_output);
-	arm_mat_init_f32(&mat_bias_out, 2, 1, (float *)bias_output);
 
-	for (int i = 0; i < LAYER_NUM; i++) {
-		arm_mat_init_f32(
-			&mat_weight_hh[i], 3 * HIDDEN_SIZE, HIDDEN_SIZE, (float *)weight_hh[i]
-		);
-		arm_mat_init_f32(&mat_bias_ih[i], 3 * HIDDEN_SIZE, 1, (float *)bias_ih[i]);
-		arm_mat_init_f32(&mat_bias_hh[i], 3 * HIDDEN_SIZE, 1, (float *)bias_hh[i]);
-	}
-	for (int i = 1; i < LAYER_NUM; i++) {
-		arm_mat_init_f32(
-			&mat_weight_ih[i], 3 * HIDDEN_SIZE, HIDDEN_SIZE,
-			(float *)weight_ih_layers[i - 1]
-		);
-	}
-}
 
-void gru_dsp(
-	float ax, float ay, float hidden[LAYER_NUM][HIDDEN_SIZE], float output[2],
-	float hidden_next[LAYER_NUM][HIDDEN_SIZE]
+static float buffer_in[3 * HIDDEN_SIZE];
+static float buffer_hidden[3 * HIDDEN_SIZE];
+static float buffer[3 * HIDDEN_SIZE];
+
+void gru_dsp_q15(
+    float ax, float ay, q15_t hidden[LAYER_NUM][HIDDEN_SIZE], 
+    float output[2], q15_t hidden_next[LAYER_NUM][HIDDEN_SIZE]
 ) {
-	float input[2][1] = {{ax}, {ay}};
-	static float buffer_in[3 * HIDDEN_SIZE], buffer_hidden[3 * HIDDEN_SIZE],
-		buffer[3 * HIDDEN_SIZE];
-	float *r = buffer, *z = buffer + HIDDEN_SIZE, *n = buffer + 2 * HIDDEN_SIZE;
-	arm_matrix_instance_f32 mat_in, mat_hidden, mat_buf;
-	arm_mat_init_f32(&mat_in, 3 * HIDDEN_SIZE, 1, buffer_in);
-	arm_mat_init_f32(&mat_hidden, 3 * HIDDEN_SIZE, 1, buffer_hidden);
-	arm_mat_init_f32(&mat_buf, 3 * HIDDEN_SIZE, 1, buffer);
-	arm_status ret;
-	for (int l = 0; l < LAYER_NUM; l++) {
-		arm_matrix_instance_f32 in, h;
-		arm_mat_init_f32(&h, HIDDEN_SIZE, 1, (float *)hidden[l]);
-		if (l == 0) {
-			arm_mat_init_f32(&in, 2, 1, (float *)input);
-		} else {
-			arm_mat_init_f32(&in, HIDDEN_SIZE, 1, (float *)hidden_next[l - 1]);
-		}
-		ret = arm_mat_mult_f32(&mat_weight_ih[l], &in, &mat_in);
-		if (ret != ARM_MATH_SUCCESS) {
-			printf("Arm math failed %d\n", ret);
-		}
-		ret = arm_mat_mult_f32(&mat_weight_hh[l], &h, &mat_hidden);
-		if (ret != ARM_MATH_SUCCESS) {
-			printf("Arm math failed %d\n", ret);
-		}
-		ret = arm_mat_add_f32(&mat_in, &mat_bias_ih[l], &mat_in);
-		if (ret != ARM_MATH_SUCCESS) {
-			printf("Arm math failed %d\n", ret);
-		}
-		ret = arm_mat_add_f32(&mat_hidden, &mat_bias_hh[l], &mat_hidden);
-		if (ret != ARM_MATH_SUCCESS) {
-			printf("Arm math failed %d\n", ret);
-		}
-		for (int i = 0; i < 2 * HIDDEN_SIZE; i++) {
-			if (isnan(buffer_in[i] + buffer_hidden[i])) {
-				printf("nan before sigmoid\n");
-				break;
-			}
-			buffer[i] = sigmoid_stable(buffer_in[i] + buffer_hidden[i]);
-			if (isnan(buffer[i])) {
-				printf("nan after sigmoid\n");
-				break;
-			}
-		}
-		arm_mult_f32(r, buffer_hidden + 2 * HIDDEN_SIZE, r, HIDDEN_SIZE);
-		arm_add_f32(r, buffer_in + 2 * HIDDEN_SIZE, r, HIDDEN_SIZE);
+    q63_t dot_result;
+    float dot_result_float;
+    
+    float *r = buffer;
+    float *z = buffer + HIDDEN_SIZE;
+    float *n = buffer + 2 * HIDDEN_SIZE;
 
-		for (int i = 0; i < HIDDEN_SIZE; i++) {
-			if (isnan(r[i])) {
-				printf("nan before tanh\n");
-				break;
-			}
-			n[i] = fast_tanh(r[i]);
-			if (isnan(n[i])) {
-				printf("nan after tanh\n");
-				break;
-			}
-		}
-		for (int i = 0; i < HIDDEN_SIZE; i++) {
-			hidden_next[l][i] = (1 - z[i]) * n[i] + z[i] * hidden[l][i];
-		}
-	}
-	output[0] = bias_output[0], output[1] = bias_output[1];
-	for (int i = 0; i < HIDDEN_SIZE; i++) {
-		output[0] += weight_output[0][i] * hidden_next[LAYER_NUM - 1][i];
-		output[1] += weight_output[1][i] * hidden_next[LAYER_NUM - 1][i];
-	}
-}
-void gru(
-	float ax, float ay, float hidden[LAYER_NUM][HIDDEN_SIZE], float output[2],
-	float hidden_next[LAYER_NUM][HIDDEN_SIZE]
-) {
-	static float buffer_in[3 * HIDDEN_SIZE], buffer_hidden[3 * HIDDEN_SIZE],
-		buffer[3 * HIDDEN_SIZE];
-	float *r = buffer, *z = buffer + HIDDEN_SIZE, *n = buffer + 2 * HIDDEN_SIZE;
-	for (int i = 0; i < 3 * HIDDEN_SIZE; i++) {
-		buffer_in[i] = bias_ih[0][i];  // bias_hh + bias_ih
-		buffer_hidden[i] = bias_hh[0][i];
-		for (int j = 0; j < HIDDEN_SIZE; j++) {	 // W_hh \cdot h
-			buffer_hidden[i] += weight_hh[0][i][j] * hidden[0][j];
-		}
+    for (int i = 0; i < 3 * HIDDEN_SIZE; ++i) {
+        // W_in \cdot x (dequantized)
+        float input_acc = ((float) weight_ih[i][0] * ax + (float) weight_ih[i][1] * ay) * s_w_ih;
 
-		buffer_in[i] += weight_ih[i][0] * ax + weight_ih[i][1] * ay;  // W_in \cdot x
-	}
-	for (int i = 0; i < 2 * HIDDEN_SIZE; i++) {
-		buffer[i] = sigmoid_stable(buffer_in[i] + buffer_hidden[i]);
-	}
-	for (int i = 0; i < HIDDEN_SIZE; i++) {
+        // buffer_in = W_in \cdot x + bias_ih (dequantized)
+        buffer_in[i] = input_acc + (float) bias_ih[0][i] * s_b_ih;
+
+        // W_hh[0] \cdot h[0]
+        arm_dot_prod_q15((q15_t *) weight_hh[0][i], (q15_t *) hidden[0], HIDDEN_SIZE, &dot_result);
+        dot_result_float = ((float) dot_result) / 1073741824.0f;
+
+        // buffer_hidden = W_hh[0] \cdot h[0] (dequantized) + bias_hh (dequantized)
+        buffer_hidden[i] = (dot_result_float * s_w_hh) + ((float) bias_hh[0][i] * s_b_hh);
+    }
+
+    for (int i = 0; i < 2 * HIDDEN_SIZE; ++i) {
+        buffer[i] = sigmoid_stable(buffer_in[i] + buffer_hidden[i]);
+    }
+
+    for (int i = 0; i < HIDDEN_SIZE; i++) {
 		n[i] = tanh_c3(
 			buffer_in[i + 2 * HIDDEN_SIZE] + r[i] * buffer_hidden[i + 2 * HIDDEN_SIZE]
 		);
 	}
-	for (int i = 0; i < HIDDEN_SIZE; i++) {
-		hidden_next[0][i] = (1 - z[i]) * n[i] + z[i] * hidden[0][i];
-	}
-	for (int l = 1; l < LAYER_NUM; l++) {
-		for (int i = 0; i < 3 * HIDDEN_SIZE; i++) {
-			buffer_in[i] = bias_ih[l][i];  // bias_hh + bias_ih
-			buffer_hidden[i] = bias_hh[l][i];
-			for (int j = 0; j < HIDDEN_SIZE; j++) {	 // W_hh \cdot h
-				buffer_hidden[i] += weight_hh[l][i][j] * hidden[l][j];
-				buffer_in[i] += weight_ih_layers[l - 1][i][j] * hidden_next[l - 1][j];
-			}
-		}
-		for (int i = 0; i < 2 * HIDDEN_SIZE; i++) {
-			buffer[i] = sigmoid_stable(buffer_in[i] + buffer_hidden[i]);
-		}
-		for (int i = 0; i < HIDDEN_SIZE; i++) {
+
+    // h_next = (1 - z) * n + z * h_prev
+    for (int i = 0; i < HIDDEN_SIZE; ++i) {
+        // Dequantize previous hidden state for the mix
+        float h_prev_float = (float) hidden[0][i] / 32768.0f;
+        
+        float h_new = (1.0f - z[i]) * n[i] + z[i] * h_prev_float;
+        
+        // Re-quantize to q15
+        hidden_next[0][i] = clip_q15(h_new) * 32768;
+    }
+
+    for (int l = 1; l < LAYER_NUM; ++l) {
+        for (int i = 0; i < 3 * HIDDEN_SIZE; ++i) {
+            // W_ih[l-1] \cdot h_next[l-1]
+            arm_dot_prod_q15((q15_t *) weight_ih_layers[l - 1][i], (q15_t *) hidden_next[l - 1], HIDDEN_SIZE, &dot_result);
+            dot_result_float = ((float) dot_result) / 1073741824.0f;
+
+            // buffer_in =  W_ih[l-1] \cdot h_next[l-1] (dequantized) + bias_ih (dequantized) 
+            buffer_in[i] = (dot_result_float * s_w_ih_layers) + ((float) bias_ih[l][i] * s_b_ih);
+
+            // W_hh[l] \cdot h[l]
+            arm_dot_prod_q15((q15_t *) weight_hh[l][i], (q15_t *) hidden[l], HIDDEN_SIZE, &dot_result);
+            dot_result_float = ((float) dot_result) / 1073741824.0f;
+
+            // buffer_hidden = W_hh[l] \cdot h[l] (dequantized) + bias_hh (dequantized) 
+            buffer_hidden[i] = (dot_result_float * s_w_hh) + ((float) bias_hh[l][i] * s_b_hh);
+        }
+
+        for (int i = 0; i < 2 * HIDDEN_SIZE; ++i) {
+            buffer[i] = sigmoid_stable(buffer_in[i] + buffer_hidden[i]);
+        }
+
+        for (int i = 0; i < HIDDEN_SIZE; i++) {
 			n[i] = tanh_stable(
 				buffer_in[i + 2 * HIDDEN_SIZE] + r[i] * buffer_hidden[i + 2 * HIDDEN_SIZE]
 			);
 		}
-		for (int i = 0; i < HIDDEN_SIZE; i++) {
-			hidden_next[l][i] = (1 - z[i]) * n[i] + z[i] * hidden[l][i];
-		}
-	}
-	// determine the output
-	output[0] = bias_output[0], output[1] = bias_output[1];
-	for (int i = 0; i < HIDDEN_SIZE; i++) {
-		output[0] += weight_output[0][i] * hidden_next[LAYER_NUM - 1][i];
-		output[1] += weight_output[1][i] * hidden_next[LAYER_NUM - 1][i];
-	}
+
+        // Compute Next Hidden State
+        for (int i = 0; i < HIDDEN_SIZE; ++i) {
+            // Dequantize previous hidden state for the mix
+            float h_prev_float = (float) hidden[l][i] / 32768.0f;
+            
+            float h_new = (1.0f - z[i]) * n[i] + z[i] * h_prev_float;
+            
+            // Re-quantize to q15
+            hidden_next[l][i] = clip_q15(h_new) * 32768;
+        }
+    }
+
+    for(int i = 0; i < 2; i++) {
+        // bias = bias_output (dequantized)
+        float bias = (float) bias_output[i] * s_o_b;
+
+        // W_out \cdot h_next[LAYER_NUM - 1]
+        arm_dot_prod_q15((q15_t *) weight_output[i], (q15_t *) hidden_next[LAYER_NUM - 1], HIDDEN_SIZE, &dot_result);
+        dot_result_float = ((float) dot_result) / 1073741824.0f;
+
+        // output = W_out \cdot h_next[L - 1] + bias
+        output[i] = dot_result_float * s_o_w + bias;
+    }
 }
 
 #endif
