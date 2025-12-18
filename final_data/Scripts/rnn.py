@@ -140,7 +140,7 @@ class SimpleRNN(nn.Module):
 
 
 INTERVAL = 0.01
-BATCH_SIZE = 64
+BATCH_SIZE = 16
 
 
 def main(args):
