@@ -117,7 +117,6 @@ float vx = 0.0, vy = 0.0;
 float prev_vx = 0.0, prev_vy = 0.0;
 float px = 0.0, py = 0.0;
 float bx = 0.0, by = 0.0;
-float prev_vx = 0.0, prev_vy = 0.0;
 int ptr_x = 0, ptr_y = 0;
 int cx = 0, cy = 0;
 int count = 0;
@@ -139,7 +138,7 @@ float px2 = 0.0, py2 = 0.0;
 	#if defined(HEURISTIC_ONE_EURO)
 		// filter
 		#define OE_MIN_CUTOFF 1.2f
-		#define OE_BETA 0.06f
+		#define OE_BETA 0.04f
 
 		#define FRICTION 0.998f
 		#define SCALE_BASE 60.0f
@@ -881,7 +880,7 @@ void Task_Send(void *argument) {
 
 	// hyperparameters
 	float dt = 1.0 / freq;
-	float scale = 10.0;
+	float scale = 12.0;
 
 	// variables
 	float buff_x[window] = {};
@@ -960,8 +959,8 @@ void Task_Send(void *argument) {
 		float ax = one_euro_update(&oe_x, data[1], dt);
 		float ay = one_euro_update(&oe_y, data[0], dt);
 		#elif defined(HEURISTIC_KALMAN)
-		float ax = kalman_update(&kf_x, raw_y);
-		float ay = kalman_update(&kf_y, raw_x);
+		float ax = kalman_update(&kf_x, data[1]);
+		float ay = kalman_update(&kf_y, data[0]);
 		#endif
 	#endif
 
@@ -1003,7 +1002,7 @@ void Task_Send(void *argument) {
 			vx = prev_vx = 0.0;
 			bx = (1 - alpha) * bx + alpha * ax;
 		} else {
-			vx += (ax - bx) * dt;
+			vx += (ax - bx) * dt * 0.998;
 			px += (vx + prev_vx) * dt / 2;
 			prev_vx = vx;
 		}
@@ -1018,30 +1017,12 @@ void Task_Send(void *argument) {
 			vy = prev_vy = 0.0;
 			by = (1 - alpha) * by + alpha * ay;
 		} else {
-			vy += (ay - by) * dt;
+			vy += (ay - by) * dt * 0.998;
 			py += (vy + prev_vy) * dt / 2;
 			prev_vy = vy;
 		}
-
-	#if defined(HEURISTIC)
-		// calculate theoritical velocity
 		float target_x = vx * scale + res_x;
 		float target_y = vy * scale + res_y;
-	#elif defined(HEURISTIC_ONE_EURO) || defined(HEURISTIC_KALMAN)
-		// friction
-		if (cx < frames)
-			vx *= FRICTION;
-		if (cy < frames)
-			vy *= FRICTION;
-
-		// fitt's law
-		float speed = sqrtf(vx * vx + vy * vy);
-		float current_scale = SCALE_BASE + (speed * SCALE_ACCEL);
-
-		// calculate theoritical velocity
-		float target_x = vx * current_scale + res_x;
-		float target_y = vy * current_scale + res_y;
-	#endif
 
 		// casting (float -> int)
 		tmp_x = (int)target_x;
@@ -1102,7 +1083,7 @@ void Task_Send_RNN(void *argument) {
 
 	int t = 0;
 	float output[2] = {0.0};
-	float scale = 25;
+	float scale = 32;
 	float buf_dx = 0, buf_dy = 0;
 	for (;;) {
 		// calculate current time interval
@@ -1137,6 +1118,7 @@ void Task_Send_RNN(void *argument) {
 
 		float vx = output[0];
 		float vy = output[1];
+		// printf("%f, %f\n", vx, vy);
 		if (isnan(vx) || isnan(vy)) {
 			// printf("overflow, resetting\n");
 			vx = 0, vy = 0;
@@ -1151,19 +1133,19 @@ void Task_Send_RNN(void *argument) {
 		buf_dx += vx * interval * rnn_alpha * scale;
 		buf_dy -= vy * interval * rnn_alpha * scale;
 
-		if (buf_dx * 0.5 > 127.0) {
+		if (buf_dx > 127.0) {
 			report.dx = 127;
-		} else if (buf_dy * 0.5 <= -128.0) {
+		} else if (buf_dy <= -128.0) {
 			report.dx = -128;
 		} else {
-			report.dx = (int)(buf_dx * 0.5);
+			report.dx = (int)(buf_dx);
 		}
-		if (buf_dy * 0.5 > 127.0) {
+		if (buf_dy > 127.0) {
 			report.dy = 127;
-		} else if (buf_dy * 0.5 <= -128) {
+		} else if (buf_dy <= -128) {
 			report.dy = -128;
 		} else {
-			report.dy = (int)(buf_dy * 0.5);
+			report.dy = (int)(buf_dy);
 		}
 
 		buf_dx -= report.dx;
@@ -1175,13 +1157,13 @@ void Task_Send_RNN(void *argument) {
 			report.dy = 0;
 		}
 
-		printf("%d, %d\n", report.dx, report.dy);
-		uint32_t end = osKernelGetTickCount();
-		printf("time: %d ms\n", (end - start) * 1000 / osKernelGetTickFreq());
+		// printf("%d, %d\n", report.dx, report.dy);
+		// uint32_t end = osKernelGetTickCount();
+		// printf("time: %d ms\n", (end - start) * 1000 / osKernelGetTickFreq());
 		USBD_HID_SendReport(&hUsbDeviceFS, (unsigned char *)&report, 4);
 		osStatus_t ret = osDelayUntil(deadline);
 		if (ret != osOK) {
-			printf("Deadline missed\n");
+			// printf("Deadline missed\n");
 		}
 	}
 }

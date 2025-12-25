@@ -32,8 +32,6 @@ extern "C" {
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "arm_math.h"
-#include "gru.h"
-#include "rnn.h"
 #include "stm32l475e_iot01_accelero.h"
 /* USER CODE END Includes */
 
@@ -51,12 +49,18 @@ typedef struct {
 // #define RNN_DSP
 // #define RNN_DSP_Q15
 // #define GRU_DSP
-#define GRU_DSP_Q15
+// #define GRU_DSP_Q15
 // #define HEURISTIC
 // #define HEURISTIC_ONE_EURO
-// #define HEURISTIC_KALMAN
+#define HEURISTIC_KALMAN
 
-#define remijang
+#if defined(GRU) || defined(GRU_DSP) || defined(GRU_DSP_Q15)
+	#include "gru.h"
+#elif defined(RNN) || defined(RNN_DSP) || defined(RNN_DSP_Q15)
+	#include "rnn.h"
+#endif
+
+// #define remijang
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */

@@ -22,5 +22,4 @@ void gru_dsp_q15(
 	q15_t hidden_next[LAYER_NUM][HIDDEN_SIZE]
 );
 
-
 #endif

@@ -12,7 +12,7 @@ INT16_MAX = 32767
 def quantize_tensor(tensor):
     """
     Returns:
-        quantized_tensor (int16), scale (float)
+        quantized_tensor (int16),_scale (float)
     """
     if tensor.numel() == 0:
         return tensor, 1.0
@@ -20,14 +20,14 @@ def quantize_tensor(tensor):
     # Symmetric quantization
     max_val = torch.max(torch.abs(tensor))
     if max_val == 0:
-        scale = 1.0
+        _scale = 1.0
     else:
-        scale = max_val / INT16_MAX
+        _scale = max_val / INT16_MAX
 
-    # Quantize: q = x / scale
-    q_tensor = (tensor / scale).round().clamp(-INT16_MAX, INT16_MAX).to(torch.int16)
+    # Quantize: q = x /_scale
+    q_tensor = (tensor / _scale).round().clamp(-INT16_MAX, INT16_MAX).to(torch.int16)
 
-    return q_tensor, scale.item()
+    return q_tensor, _scale.item()
 
 
 def format_1d_array(tensor, indent=4):
@@ -172,16 +172,16 @@ def main():
         # ---------------------------------------------------------
 
         # Note on Scaling
-        print(f"/* QUANTIZATION SCALES (Use these to dequantize):")
-        print(f" * weight_ih scale: {s_w_ih_0:.8f}")
+        print(f"// QUANTIZATION SCALES (Use these to dequantize)")
+        print(f"const float weight_ih_scale = {s_w_ih_0:.8f};")
         if w_ih_layers is not None:
-            print(f" * weight_ih_layers scale: {s_w_ih_layers:.8f}")
-        print(f" * bias_ih scale: {s_b_ih:.8f}")
-        print(f" * weight_hh scale: {s_w_hh:.8f}")
-        print(f" * bias_hh scale: {s_b_hh:.8f}")
-        print(f" * output weight scale: {s_w_out:.8f}")
-        print(f" * output bias scale: {s_b_out:.8f}")
-        print(f" */\n")
+            print(f"const float weight_ih_layers_scale = {s_w_ih_layers:.8f};")
+        print(f"const float bias_ih_scale = {s_b_ih:.8f};")
+        print(f"const float weight_hh_scale = {s_w_hh:.8f};")
+        print(f"const float bias_hh_scale = {s_b_hh:.8f};")
+        print(f"const float out_weight_scale = {s_w_out:.8f};")
+        print(f"const float out_bias_scale = {s_b_out:.8f};")
+        print(f"\n")
 
         # weight_ih
         print(f"const int16_t weight_ih[3 * HIDDEN_SIZE][{input_size}] = {{")
